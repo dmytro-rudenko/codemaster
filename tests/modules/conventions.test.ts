@@ -7,7 +7,7 @@ import { CONFIG_DEFAULTS, CONFIG_FILE_NAME } from "../../src/consts/config.ts";
 import { ROLES_ALIASES } from "../../src/consts/roles.ts";
 import type { ConfigProject } from "../../src/interfaces/config.ts";
 import { ensureInstalled } from "../../src/modules/install.ts";
-import { formatProfile, scanConventions, writeProfile } from "../../src/modules/conventions.ts";
+import { formatProfile, runCommand, scanConventions, writeProfile } from "../../src/modules/conventions.ts";
 
 before(() => {
   ensureInstalled();
@@ -331,4 +331,52 @@ test("writeProfile writes two-space JSON with a trailing newline", async () => {
     writeProfile(directory, merged);
     assert.equal(readFileSync(join(directory, CONFIG_FILE_NAME), "utf8"), `${JSON.stringify(merged, null, 2)}\n`);
   });
+});
+
+test("colocated tests next to modules give testsLocation colocated", async () => {
+  const modules = Object.fromEntries(
+    Array.from({ length: 6 }, (_, position) => [
+      [`src/modules/thing${position}.ts`, "export {};\n"],
+      [`src/modules/thing${position}.test.ts`, "export {};\n"],
+    ]).flat(),
+  );
+  await withProject({ "src/types/a.ts": "export interface Thing { name: string }\n", ...modules }, async (directory) => {
+    const { profile, sources } = await scan(directory);
+    assert.equal(profile.testsLocation, "colocated");
+    assert.match(sources.testsLocation, /^dominant/);
+  });
+});
+
+test("runCommand leaves an invalid .codemaster.json untouched and returns 1", async () => {
+  const invalid = "{ not json";
+  await withProject(
+    { "src/constants/a.ts": upperConstants(5), "src/types/a.ts": "export interface Thing { name: string }\n", [CONFIG_FILE_NAME]: invalid },
+    async (directory) => {
+      const written: string[] = [];
+      const originalStderr = process.stderr.write;
+      const originalStdout = process.stdout.write;
+      process.stderr.write = ((chunk: string | Uint8Array) => written.push(String(chunk)) > 0) as typeof process.stderr.write;
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      let status: number;
+      try {
+        status = await runCommand({
+          argumentsList: ["--refresh"],
+          projectRoot: directory,
+          config: structuredClone(CONFIG_DEFAULTS),
+          configWarnings: [],
+          input: "",
+          pluginRoot: process.cwd(),
+        });
+      } finally {
+        process.stderr.write = originalStderr;
+        process.stdout.write = originalStdout;
+      }
+      assert.equal(status, 1);
+      assert.equal(readFileSync(join(directory, CONFIG_FILE_NAME), "utf8"), invalid);
+      assert.ok(
+        written.join("").split("\n").includes("warning config .codemaster.json: invalid JSON; profile not written"),
+        written.join(""),
+      );
+    },
+  );
 });

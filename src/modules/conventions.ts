@@ -75,7 +75,7 @@ function describeTest(file: string): { location: string; suffix: string | null }
   const segments = file.split("/");
   const suffix = /\.(test|spec)\./.exec(segments[segments.length - 1])?.[1] ?? null;
   const inFolder = CONVENTIONS_TEST_FOLDERS.includes(segments[0]);
-  return suffix === null && !inFolder ? null : { location: inFolder ? segments[0] : "", suffix };
+  return suffix === null && !inFolder ? null : { location: inFolder ? segments[0] : "colocated", suffix };
 }
 
 function caseOf(name: string): string | null {
@@ -242,7 +242,12 @@ function describeProfile(projectRoot: string, config: ConfigProject, raw: Record
 export async function runCommand(context: CommandContext): Promise<number> {
   const { argumentsList, projectRoot, config } = context;
   const path = join(projectRoot, CONFIG_FILE_NAME);
-  const raw = existsSync(path) ? asRecord(readJsonFile(path).value) : {};
+  const parsed = existsSync(path) ? readJsonFile(path) : { value: {}, error: null };
+  if (parsed.error !== null) {
+    process.stderr.write(`warning config ${CONFIG_FILE_NAME}: invalid JSON; profile not written\n`);
+    return 1;
+  }
+  const raw = asRecord(parsed.value);
   if (existsSync(path) && !argumentsList.includes("--refresh")) {
     process.stdout.write(describeProfile(projectRoot, config, raw));
     return 0;
