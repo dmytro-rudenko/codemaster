@@ -8,7 +8,7 @@ import {
   TOURNAMENT_TIE_ORDER,
   TOURNAMENT_TIMEOUT_MILLISECONDS,
 } from "../consts/tournament.ts";
-import { listChangedFiles, listChangedLineRanges, resolveStateDirectory } from "../helpers/infrastructure/git.ts";
+import { isRepository, listChangedFiles, listChangedLineRanges, resolveStateDirectory } from "../helpers/infrastructure/git.ts";
 import { parseSource } from "../helpers/infrastructure/ast-grep.ts";
 import { runProcess } from "../helpers/infrastructure/process.ts";
 import { detectLayout, resolveFileRole } from "../helpers/logic/file-role.ts";
@@ -348,6 +348,10 @@ async function recordDone(projectRoot: string, directory: string): Promise<void>
 export async function runCommand(context: CommandContext): Promise<number> {
   const { argumentsList, projectRoot, config } = context;
   const [first, second] = argumentsList;
+  if (["--candidates", "--skip", "--done"].includes(first) && !isRepository(projectRoot)) {
+    process.stdout.write("codemaster: not a git repository; the tournament keeps its state in git\n");
+    return 0;
+  }
   if (first === "--skip") {
     const reasonPosition = argumentsList.indexOf("--reason");
     const reason = reasonPosition === -1 ? undefined : argumentsList[reasonPosition + 1];

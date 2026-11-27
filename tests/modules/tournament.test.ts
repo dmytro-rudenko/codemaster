@@ -513,6 +513,17 @@ test("findCandidates takes a function by body lines alone and drops it below bot
   assert.deepEqual(await findCandidates({ projectRoot: directory, config: tooShort }), []);
 });
 
+test("tournament --candidates outside git explains itself and returns 0", () => {
+  const directory = copyFixture("candidates");
+  try {
+    const { status, stdout, stderr } = runCli(["tournament", "--candidates"], { cwd: directory });
+    assert.equal(status, 0, stderr);
+    assert.equal(stdout.trim(), "codemaster: not a git repository; the tournament keeps its state in git");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("runTournament refuses a functionName that is not an identifier", async () => {
   const directory = copyFixture("tournament/good");
   try {
