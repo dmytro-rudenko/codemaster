@@ -1,0 +1,68 @@
+---
+name: codemaster
+version: 0.1.0
+description: Use while writing or changing code in this project and whenever the codemaster Stop hook asks for it. Applies the code-organisation rules (layout, names, parameters, nesting, destructuring, KISS) after the project's own conventions, runs the codemaster checks, the function tournament, coverage and the library digest, and fixes what they find.
+---
+
+# codemaster
+
+codemaster keeps TypeScript and JavaScript code organised. A Stop hook runs deterministic checks after each answer. This skill is the working procedure for writing code under those rules and for fixing what the hook reports.
+
+Every command below is `node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" <subcommand>`, run from the project root.
+
+## Priority
+
+Apply rules in this order and stop at the first one that speaks:
+
+1. The project's explicit rules: `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING*`, linter config (ESLint, Biome).
+2. The dominant conventions of the existing code (recorded in `.codemaster.json` by `conventions`).
+3. The codemaster defaults, only where the project is silent.
+
+Never rename existing folders to match codemaster names. If the project calls a role `services` or `types`, the `roles` field of `.codemaster.json` maps it; the code stays where it is.
+
+## Rules while coding
+
+These rules are not checked by a script. Follow them in every change.
+
+- KISS. Pick the simplest code that works.
+- Before a task, check whether the framework or an installed library already does it. Read `.claude/skills/codemaster-libraries/SKILL.md` when it exists.
+- Write simple things yourself (HTTP requests, CRUD). For complex ones (a cron scheduler, queues, parsers) look for a ready-made tool first.
+- Keep call nesting low and avoid callback hell: use async/await and early returns.
+- Use destructuring where it fits.
+- Use full names, and two words where two are enough.
+- On the frontend use a component approach and MVC, unless the project sets another structure.
+- Split helpers into `infrastructure` (database, redis, internal tools), `external` (third-party APIs) and `logic` (pure functions). This is a recommendation for projects that have no helper layout of their own.
+
+The checked rules (layout, naming, parameters, nesting, tests, packages) are listed with examples in `references/rules.md`. Write new code so that `check` has nothing to say.
+
+## After the Stop hook
+
+The hook blocks with a report that starts with `Run the codemaster skill (codemaster:codemaster) for this branch.` Work through these steps in order.
+
+1. Read the report, then `CLAUDE.md`, `AGENTS.md` and `CONTRIBUTING*`.
+   - Project rules outrank codemaster. When a `check` finding contradicts a project rule, do not fix it. Write `rules.<id>` into `.codemaster.json` (`"off"` or a new value, for example `{"max": 8}`) with a `reason` that quotes the project rule, and name this in the final report.
+   - When the profile printed at the top of the report disagrees with the project's rules, correct the fields in `.codemaster.json` by hand, or run `node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" conventions --refresh`. Fields you wrote yourself (no entry in `sources`) are never overwritten by the scanner.
+   - When you create `.codemaster.local.json` for the first time, add it to the project's `.gitignore`.
+2. Fix every `error`. Fix a `warning` when the change is small; otherwise name it in the report.
+3. For each tournament candidate (`<file>:<line> <functionName> complexity=<c> lines=<l>`):
+   1. Create `<scratchpad>/tournament/<functionName>/` and write `first.ts`, `readable.ts`, `optimized.ts`, `cases.ts` and `target.json` in it, as described in `references/tournament.md`.
+   2. Run `node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" tournament <dir>`.
+   3. Move the printed `winner: <variant>` into the code, in place of the function. `winner: none` (exit 1) means every variant failed a case: fix the cases or the variants and run again.
+   4. Run the project's tests.
+   5. Run `node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" tournament --done <dir>`.
+   - A function that cannot be isolated (closure over module state, path aliases) is skipped: `node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" tournament --skip <file>#<name> --reason "<text>"`. Name every skipped function in the final report.
+   - List the open candidates at any time with `node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" tournament --candidates`.
+4. Libraries. For every `add` and `stale` line of the report, write the library summary as described in `references/libraries.md`. Run `node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" libraries` to see the full list, and `node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" libraries --prune --index` after the files are written. It deletes the `remove` files and rebuilds the index.
+5. Coverage. Run the project's tests with coverage and bring line coverage of the changed files with the roles `module` and `single-file-module` to 100%, adding tests to their mirror test files. The command is, in this order:
+   1. `coverageCommand` from `.codemaster.json`;
+   2. `npx vitest run --coverage` when `package.json` lists `vitest`;
+   3. `npx jest --coverage` when it lists `jest`;
+   4. `node --test --experimental-test-coverage`.
+
+   A line that cannot honestly be covered (a defensive branch for an impossible state) is named in the report. Do not write an empty test for it.
+6. Run `node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" check` again. Tell the user about every remaining `error` and why it remains.
+7. Report: what was fixed, coverage of the changed modules, tournament winners and skipped functions, which libraries were added or removed, and every `rules.<id>` you wrote with its reason.
+
+## Configuration
+
+Fields of `.codemaster.json` and `.codemaster.local.json`, the layout detection, and every rule-id with a bad and a good example are in `references/rules.md`.
