@@ -1,11 +1,13 @@
-import { after, test } from "node:test";
+import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { CONFIG_DEFAULTS } from "../../src/consts/config.ts";
-import { scoreVariants } from "../../src/modules/tournament.ts";
+import { findCandidates, runTournament, scoreVariants } from "../../src/modules/tournament.ts";
+import { ensureInstalled } from "../../src/modules/install.ts";
+import { copyFixture, initRepository, runCli, stateDirectory } from "../acceptance/run-cli.ts";
 import type { ConfigWeights } from "../../src/interfaces/config.ts";
 import type { TournamentMetrics, TournamentVariantName } from "../../src/interfaces/tournament.ts";
 
@@ -286,3 +288,150 @@ test("runner measure: runs exactly the given number of calls and reports nanosec
     `${nanosecondsPerCall} ns × ${iterations} exceeds the process wall time ${elapsedNanoseconds} ns`,
   );
 });
+
+before(() => {
+  ensureInstalled();
+});
+
+const CORRECT_SUM = "export function sumList(values) { return values.reduce((total, value) => total + value, 0); }\n";
+
+function dyingSum(condition: string): string {
+  return [
+    `const dying = process.argv[2] === "measure" && ${condition};`,
+    "export function sumList(values) {",
+    "  if (dying) {",
+    "    process.stderr.write(\"dying\\n\");",
+    "    process.exit(3);",
+    "  }",
+    "  return values.reduce((total, value) => total + value, 0);",
+    "}",
+    "",
+  ].join("\n");
+}
+
+function createTournament(variants: Record<TournamentVariantName, string>): string {
+  const directory = mkdtempSync(join(tmpdir(), "codemaster-tournament-"));
+  writeFileSync(join(directory, "target.json"), JSON.stringify({ file: "src/math.ts", functionName: "sumList" }));
+  writeFileSync(
+    join(directory, "cases.ts"),
+    "export const cases = [{ input: [[1, 2, 3]], expected: 6 }, { input: [[]], expected: 0 }];\n",
+  );
+  for (const [variant, text] of Object.entries(variants)) {
+    writeFileSync(join(directory, `${variant}.ts`), text);
+  }
+  return directory;
+}
+
+function assertFiniteScores(variants: Array<{ passed: boolean; score: number | null }>): void {
+  for (const { score } of variants.filter(({ passed }) => passed)) {
+    assert.ok(typeof score === "number" && Number.isFinite(score), `score ${score} is not finite`);
+  }
+}
+
+test("runTournament: a variant whose speed run dies drops out with the run's first output line", async () => {
+  const directory = createTournament({
+    readable: CORRECT_SUM,
+    first: dyingSum("!process.execArgv.includes(\"--print-bytecode\")"),
+    optimized: CORRECT_SUM,
+  });
+  try {
+    const outcome = await runTournament(directory, CONFIG_DEFAULTS);
+    const first = outcome.variants.find(({ variant }) => variant === "first");
+    assert.deepEqual(
+      { passed: first?.passed, failure: first?.failure, metrics: first?.metrics, score: first?.score },
+      { passed: false, failure: "measure: dying", metrics: null, score: null },
+    );
+    assertFiniteScores(outcome.variants);
+    assert.notEqual(outcome.winner, "first");
+    assert.notEqual(outcome.winner, "none");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("runTournament: a variant whose bytecode run dies drops out as a measure failure", async () => {
+  const directory = createTournament({
+    readable: CORRECT_SUM,
+    first: CORRECT_SUM,
+    optimized: dyingSum("process.execArgv.includes(\"--print-bytecode\")"),
+  });
+  try {
+    const outcome = await runTournament(directory, CONFIG_DEFAULTS);
+    const optimized = outcome.variants.find(({ variant }) => variant === "optimized");
+    assert.equal(optimized?.passed, false);
+    assert.match(optimized?.failure ?? "", /^measure: /);
+    assert.equal(optimized?.score, null);
+    assertFiniteScores(outcome.variants);
+    assert.notEqual(outcome.winner, "optimized");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("runTournament: a variant without a Bytecode length for the target drops out", async () => {
+  const directory = createTournament({
+    readable: CORRECT_SUM,
+    first: [
+      "function sumList(values) { return 0; }",
+      "function realSum(values) { return values.reduce((total, value) => total + value, 0); }",
+      "export { realSum as sumList };",
+      "",
+    ].join("\n"),
+    optimized: CORRECT_SUM,
+  });
+  try {
+    const outcome = await runTournament(directory, CONFIG_DEFAULTS);
+    const first = outcome.variants.find(({ variant }) => variant === "first");
+    assert.equal(first?.passed, false);
+    assert.equal(first?.failure, "bytecode: not found");
+    assert.equal(first?.score, null);
+    assertFiniteScores(outcome.variants);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+function doneFilePath(directory: string): string {
+  const state = stateDirectory(directory);
+  mkdirSync(state, { recursive: true });
+  return join(state, "tournament-done.json");
+}
+
+for (const [label, content] of [
+  ["corrupt", "{not json"],
+  ["non-array", "{\"key\":\"src/math.ts#scoreValues\",\"skipped\":true}"],
+]) {
+  test(`findCandidates: a ${label} done file reads as empty`, async () => {
+    const directory = copyFixture("candidates");
+    initRepository(directory, { commitFiles: false });
+    writeFileSync(doneFilePath(directory), content);
+    const candidates = await findCandidates({ projectRoot: directory, config: CONFIG_DEFAULTS });
+    assert.ok(
+      candidates.some(({ file, functionName }) => file === "src/math.ts" && functionName === "scoreValues"),
+      JSON.stringify(candidates),
+    );
+  });
+}
+
+test("--skip over a corrupt done file writes a valid array", () => {
+  const directory = copyFixture("candidates");
+  initRepository(directory, { commitFiles: false });
+  const donePath = doneFilePath(directory);
+  writeFileSync(donePath, "{not json");
+  const result = runCli(["tournament", "--skip", "src/math.ts#scoreValues", "--reason", "closure"], { cwd: directory });
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(readFileSync(donePath, "utf8")), [
+    { key: "src/math.ts#scoreValues", bodyHash: null, skipped: true, reason: "closure" },
+  ]);
+});
+
+for (const skipArguments of [["--skip"], ["--skip", "src/math.ts#scoreValues"], ["--skip", "src/math.ts#scoreValues", "--reason"]]) {
+  test(`${skipArguments.join(" ")} prints the skip usage, returns 2 and writes nothing`, () => {
+    const directory = copyFixture("candidates");
+    initRepository(directory, { commitFiles: false });
+    const result = runCli(["tournament", ...skipArguments], { cwd: directory });
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /^usage: codemaster tournament --skip <file>#<name> --reason <text>$/m);
+    assert.equal(existsSync(join(stateDirectory(directory), "tournament-done.json")), false);
+  });
+}

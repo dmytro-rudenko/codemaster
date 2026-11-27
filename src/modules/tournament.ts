@@ -97,7 +97,15 @@ export function scoreVariants(
 
 function readDoneEntries(projectRoot: string): TournamentDoneEntry[] {
   const path = join(resolveStateDirectory(projectRoot), "tournament-done.json");
-  return existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as TournamentDoneEntry[]) : [];
+  if (!existsSync(path)) {
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+    return Array.isArray(parsed) ? (parsed as TournamentDoneEntry[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 function appendDoneEntry(projectRoot: string, entry: TournamentDoneEntry): void {
@@ -161,13 +169,32 @@ function runRunner(
   directory: string,
   runnerArguments: string[],
   nodeFlags: string[],
-): { result: Record<string, unknown> | null; output: string; timedOut: boolean } {
+): { result: Record<string, unknown> | null; output: string; timedOut: boolean; status: number | null } {
   const runner = resolve(import.meta.dirname, "../../bin/tournament-runner.ts");
-  const { stdout, stderr, timedOut } = runProcess(process.execPath, [...nodeFlags, runner, ...runnerArguments], {
+  const { stdout, stderr, timedOut, status } = runProcess(process.execPath, [...nodeFlags, runner, ...runnerArguments], {
     cwd: directory,
     timeoutMilliseconds: TOURNAMENT_TIMEOUT_MILLISECONDS,
   });
-  return { result: readRunnerResult(stdout), output: `${stdout}\n${stderr}`, timedOut };
+  return { result: readRunnerResult(stdout), output: `${stdout}\n${stderr}`, timedOut, status };
+}
+
+function firstOutputLine(output: string): string {
+  return output.split("\n").find((line) => line.trim() !== "")?.trim() ?? "no result";
+}
+
+function runMeasure(
+  directory: string,
+  measureArguments: string[],
+  nodeFlags: string[],
+): { result: Record<string, unknown>; output: string } | { failure: string } {
+  const { result, output, timedOut, status } = runRunner(directory, measureArguments, nodeFlags);
+  if (timedOut) {
+    return { failure: "measure: timeout" };
+  }
+  if (status !== 0 || result === null) {
+    return { failure: `measure: ${firstOutputLine(output)}` };
+  }
+  return { result, output };
 }
 
 function verifyVariant(directory: string, variantPath: string, functionName: string): string | null {
@@ -177,16 +204,28 @@ function verifyVariant(directory: string, variantPath: string, functionName: str
     return "timeout";
   }
   if (result === null) {
-    return output.split("\n").find((line) => line.trim() !== "")?.trim() ?? "no result";
+    return firstOutputLine(output);
   }
   return result.passed === true ? null : String(result.failure);
 }
 
-function measureBytecode(directory: string, variantPath: string, functionName: string): { length: number; bytecode: number } {
+function measureBytecode(
+  directory: string,
+  variantPath: string,
+  functionName: string,
+): { length: number; bytecode: number } | { failure: string } {
   const flags = ["--print-bytecode", `--print-bytecode-filter=${functionName}`, "--trace-deopt"];
   const measureArguments = ["measure", variantPath, join(directory, "cases.ts"), functionName, String(TOURNAMENT_ITERATIONS)];
-  const { output } = runRunner(directory, measureArguments, flags);
-  const length = Number(/Bytecode length: (\d+)/.exec(output)?.[1] ?? 0);
+  const measured = runMeasure(directory, measureArguments, flags);
+  if ("failure" in measured) {
+    return measured;
+  }
+  const { output } = measured;
+  const match = /Bytecode length: (\d+)/.exec(output);
+  if (match === null) {
+    return { failure: "bytecode: not found" };
+  }
+  const length = Number(match[1]);
   const deoptimizationPattern = new RegExp(
     "\\[bailout \\(kind: [^)]*\\): begin\\. deoptimizing \\S+ <JSFunction " + functionName + " ",
   );
@@ -194,35 +233,48 @@ function measureBytecode(directory: string, variantPath: string, functionName: s
   return { length, bytecode: length + TOURNAMENT_DEOPT_PENALTY * deoptimizations };
 }
 
-function measureSpeed(directory: string, variantPath: string, functionName: string): number {
+function measureSpeed(directory: string, variantPath: string, functionName: string): { speed: number } | { failure: string } {
   const measureArguments = ["measure", variantPath, join(directory, "cases.ts"), functionName, String(TOURNAMENT_ITERATIONS)];
-  const timings = Array.from({ length: TOURNAMENT_RUNS }, () => {
-    const { result } = runRunner(directory, measureArguments, []);
-    return Number(result?.nanosecondsPerCall ?? Number.NaN);
-  });
+  const timings: number[] = [];
+  for (let run = 0; run < TOURNAMENT_RUNS; run++) {
+    const measured = runMeasure(directory, measureArguments, []);
+    if ("failure" in measured) {
+      return measured;
+    }
+    timings.push(Number(measured.result.nanosecondsPerCall));
+  }
   timings.sort((left, right) => left - right);
-  return timings[Math.floor(timings.length / 2)];
+  return { speed: timings[Math.floor(timings.length / 2)] };
 }
 
 async function measureVariant(
   directory: string,
   variantPath: string,
   target: { functionName: string; benchmark: boolean },
-): Promise<TournamentMetrics | null> {
+): Promise<{ metrics: TournamentMetrics } | { failure: string }> {
   const { functionName, benchmark } = target;
   const root = (await parseSource(variantPath, readFileSync(variantPath, "utf8"))).root();
   const found = listFunctions(root).find(({ name }) => name === functionName);
   if (found === undefined) {
-    return null;
+    return { failure: `function ${functionName} not found` };
   }
-  const { length: bytecodeLength, bytecode } = measureBytecode(directory, variantPath, functionName);
+  const bytecodeRun = measureBytecode(directory, variantPath, functionName);
+  if ("failure" in bytecodeRun) {
+    return bytecodeRun;
+  }
+  const speedRun = benchmark ? measureSpeed(directory, variantPath, functionName) : { speed: null };
+  if ("failure" in speedRun) {
+    return speedRun;
+  }
   return {
-    readability: measureCognitiveComplexity(found.node),
-    length: countBodyLines(found.node),
-    bytecode,
-    speed: benchmark ? measureSpeed(directory, variantPath, functionName) : null,
-    bytecodePerToken: bytecodeLength / countTokens(found.node),
-    desugared: countDesugared(found.node),
+    metrics: {
+      readability: measureCognitiveComplexity(found.node),
+      length: countBodyLines(found.node),
+      bytecode: bytecodeRun.bytecode,
+      speed: speedRun.speed,
+      bytecodePerToken: bytecodeRun.length / countTokens(found.node),
+      desugared: countDesugared(found.node),
+    },
   };
 }
 
@@ -239,11 +291,11 @@ async function evaluateVariant(
   if (failure !== null) {
     return { variant, passed: false, failure, metrics: null, score: null };
   }
-  const metrics = await measureVariant(directory, variantPath, target);
-  if (metrics === null) {
-    return { variant, passed: false, failure: `function ${target.functionName} not found`, metrics: null, score: null };
+  const measured = await measureVariant(directory, variantPath, target);
+  if ("failure" in measured) {
+    return { variant, passed: false, failure: measured.failure, metrics: null, score: null };
   }
-  return { variant, passed: true, failure: null, metrics, score: null };
+  return { variant, passed: true, failure: null, metrics: measured.metrics, score: null };
 }
 
 export async function runTournament(directory: string, config: ConfigProject): Promise<TournamentResult> {
@@ -295,7 +347,11 @@ export async function runCommand(context: CommandContext): Promise<number> {
   const [first, second] = argumentsList;
   if (first === "--skip") {
     const reasonPosition = argumentsList.indexOf("--reason");
-    const reason = reasonPosition === -1 ? null : (argumentsList[reasonPosition + 1] ?? null);
+    const reason = reasonPosition === -1 ? undefined : argumentsList[reasonPosition + 1];
+    if (second === undefined || second === "--reason" || reason === undefined) {
+      process.stderr.write("usage: codemaster tournament --skip <file>#<name> --reason <text>\n");
+      return 2;
+    }
     appendDoneEntry(projectRoot, { key: second, bodyHash: null, skipped: true, reason });
     return 0;
   }
