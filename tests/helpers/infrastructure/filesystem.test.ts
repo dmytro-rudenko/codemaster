@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -67,6 +67,18 @@ test("removeFile deletes an existing file and ignores a missing one", () => {
     removeFile(path);
     assert.equal(existsSync(path), false);
     assert.doesNotThrow(() => removeFile(path));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("writeTextFile refuses to write through a symbolic link", () => {
+  const directory = mkdtempSync(join(tmpdir(), "codemaster-filesystem-"));
+  try {
+    const target = join(directory, "outside.json");
+    symlinkSync(target, join(directory, "link.json"));
+    assert.throws(() => writeTextFile(join(directory, "link.json"), "{}\n"));
+    assert.equal(existsSync(target), false);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

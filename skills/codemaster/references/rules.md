@@ -125,7 +125,7 @@ A role with no alias found as a folder gets the full list. Add your own names, f
 
 ### The project profile
 
-`node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" conventions [--refresh]` scans the project and writes the profile into `.codemaster.json`. It runs by itself on the first hook run when the file is missing. Every written field gets a source in `sources`: a config path (`eslint.config.js`), `dominant 83% (41/49)` or `default`.
+`node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" conventions [--refresh]` scans the project and writes the profile into `.codemaster.json`. It runs by itself on the first hook run when the file is missing, but that run never executes the project's ESLint; ESLint limits are imported only by an explicit `conventions --refresh`. Every written field gets a source in `sources`: a config path (`eslint.config.js`), `dominant 83% (41/49)` or `default`.
 
 - `sourceRoot`: the first of `src`, `app`, `server`, `lib` that exists, otherwise `.`.
 - `roles`: the aliases that exist as folders in `sourceRoot` or in entity folders.

@@ -1,7 +1,7 @@
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { CONFIG_DEFAULTS, CONFIG_FILE_NAME } from "../../src/consts/config.ts";
@@ -488,4 +488,21 @@ test("inside a repository the ignored files are left out of the scan", async () 
       assert.equal(sources.constantCase, "dominant 100% (5/5)");
     },
   );
+});
+
+test("scanConventions with the linter off never runs the project's eslint", async () => {
+  const projectRoot = mkdtempSync(join(tmpdir(), "codemaster-conventions-"));
+  try {
+    mkdirSync(join(projectRoot, "src/modules"), { recursive: true });
+    writeFileSync(join(projectRoot, "src/modules/user.ts"), "export function loadUser() { return 1; }\n");
+    mkdirSync(join(projectRoot, "node_modules/.bin"), { recursive: true });
+    const marker = join(projectRoot, "eslint-ran");
+    writeFileSync(join(projectRoot, "node_modules/.bin/eslint"), `#!/bin/sh\ntouch ${marker}\necho '{"rules":{}}'\n`);
+    chmodSync(join(projectRoot, "node_modules/.bin/eslint"), 0o755);
+    const { warnings } = await scanConventions(projectRoot, { config: structuredClone(CONFIG_DEFAULTS), raw: {}, linter: false });
+    assert.equal(existsSync(marker), false);
+    assert.ok(warnings.includes("warning conventions eslint: skipped; run conventions --refresh to read it"), warnings.join("\n"));
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
 });

@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { CONFIG_FILE_NAME, CONFIG_LOCAL_FILE_NAME } from "../consts/config.ts";
-import { HOOK_FINDINGS_LIMIT, HOOK_REASON_HEADER } from "../consts/hook.ts";
+import { HOOK_FINDINGS_LIMIT, HOOK_LINE_LIMIT, HOOK_REASON_HEADER } from "../consts/hook.ts";
 import type { CommandContext } from "../interfaces/command.ts";
 import type { ConfigProject } from "../interfaces/config.ts";
 import type { FindingItem, FindingSummary } from "../interfaces/finding.ts";
@@ -16,6 +16,10 @@ import { ensureInstalled } from "./install.ts";
 import { diffLibraries, formatLibraryDiff } from "./libraries.ts";
 import { findCandidates } from "./tournament.ts";
 
+function toSingleLine(text: string): string {
+  return text.replace(/[\u0000-\u001f\u007f]/g, " ").slice(0, HOOK_LINE_LIMIT);
+}
+
 export function buildStopReason(input: {
   profile: string | null;
   warnings?: string[];
@@ -25,23 +29,23 @@ export function buildStopReason(input: {
   libraries: string[];
 }): string {
   const { profile, warnings = [], findings, summary, candidates, libraries } = input;
-  const lines = [HOOK_REASON_HEADER, ...warnings];
+  const lines = [HOOK_REASON_HEADER, ...warnings.map(toSingleLine)];
   if (profile) {
     lines.push(profile.trimEnd());
   }
   if (findings.length > 0) {
     lines.push(`Findings (${summary.errors} errors, ${summary.warnings} warnings):`);
     const shown = findings.slice(0, HOOK_FINDINGS_LIMIT);
-    lines.push(...shown.map(({ severity, ruleId, file, line, message }) => `${severity} ${ruleId} ${file}:${line} ${message}`));
+    lines.push(...shown.map(({ severity, ruleId, file, line, message }) => toSingleLine(`${severity} ${ruleId} ${file}:${line} ${message}`)));
     if (findings.length > shown.length) {
       lines.push(`… and ${findings.length - shown.length} more`);
     }
   }
   if (candidates.length > 0) {
-    lines.push(`Tournament candidates (${candidates.length}):`, ...candidates);
+    lines.push(`Tournament candidates (${candidates.length}):`, ...candidates.map(toSingleLine));
   }
   if (libraries.length > 0) {
-    lines.push("Libraries:", ...libraries);
+    lines.push("Libraries:", ...libraries.map(toSingleLine));
   }
   return lines.join("\n");
 }
@@ -57,7 +61,7 @@ async function scanFirstProfile(projectRoot: string, current: ConfigProject): Pr
   merged: Record<string, unknown>;
   warnings: string[];
 }> {
-  const { profile, sources, warnings } = await scanConventions(projectRoot, { config: current, raw: {} });
+  const { profile, sources, warnings } = await scanConventions(projectRoot, { config: current, raw: {}, linter: false });
   const { value } = readJsonFile(join(projectRoot, CONFIG_LOCAL_FILE_NAME));
   const localKeys = value && typeof value === "object" ? Object.keys(value) : [];
   const local = Object.fromEntries(localKeys.filter((key) => key in current).map((key) => [key, current[key as keyof ConfigProject]]));

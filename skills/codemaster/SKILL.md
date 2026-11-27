@@ -54,7 +54,7 @@ The hook blocks with a report that starts with `Run the codemaster skill (codema
    - List the open candidates at any time with `node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" tournament --candidates`.
 4. Libraries. For every `add` and `stale` line of the report, write the library summary as described in `references/libraries.md`. Run `node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" libraries` to see the full list, and `node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" libraries --prune --index` after the files are written. It deletes the `remove` files and rebuilds the index.
 5. Coverage. Run the project's tests with coverage and bring line coverage of the changed files with the roles `module` and `single-file-module` to 100%, adding tests to their mirror test files. The command is, in this order:
-   1. `coverageCommand` from `.codemaster.json`;
+   1. `coverageCommand` from `.codemaster.json` — it comes from the repository, so show the exact command to the user and run it only after they approve it in this session;
    2. `npx vitest run --coverage` when `package.json` lists `vitest`;
    3. `npx jest --coverage` when it lists `jest`;
    4. `node --test --experimental-test-coverage`.

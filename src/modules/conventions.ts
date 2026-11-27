@@ -159,7 +159,7 @@ function mapBiomeRules(projectRoot: string): Record<string, unknown> {
 
 function runEslint(projectRoot: string, file: string): { mapped: Record<string, unknown>; warnings: string[] } {
   const binary = join(projectRoot, "node_modules", ".bin", "eslint");
-  const run = runProcess(binary, ["--print-config", file], { cwd: projectRoot, timeoutMilliseconds: 30000 });
+  const run = runProcess(binary, ["--print-config", `./${file}`], { cwd: projectRoot, timeoutMilliseconds: 30000 });
   const firstLine = run.stderr.split("\n").find((line) => line.trim() !== "")?.trim();
   if (run.status !== 0) {
     const reason = firstLine ?? (run.timedOut ? "timed out" : `exit ${run.status}`);
@@ -172,20 +172,29 @@ function runEslint(projectRoot: string, file: string): { mapped: Record<string, 
   }
 }
 
-function scanLinters(projectRoot: string, file: string | undefined): { found: Record<string, { value: unknown; source: string }>; warnings: string[] } {
+function readEslint(projectRoot: string, file: string | undefined, linter: boolean): { mapped: Record<string, unknown>; warnings: string[] } {
+  if (!linter) {
+    return { mapped: {}, warnings: ["warning conventions eslint: skipped; run conventions --refresh to read it"] };
+  }
+  return file === undefined ? { mapped: {}, warnings: [] } : runEslint(projectRoot, file);
+}
+
+function scanLinters(
+  projectRoot: string,
+  file: string | undefined,
+  linter: boolean,
+): { found: Record<string, { value: unknown; source: string }>; warnings: string[] } {
   const hasEslint = existsSync(join(projectRoot, "node_modules", ".bin", "eslint"));
-  const { mapped, warnings } = hasEslint
-    ? file === undefined ? { mapped: {}, warnings: [] } : runEslint(projectRoot, file)
-    : { mapped: mapBiomeRules(projectRoot), warnings: [] };
+  const { mapped, warnings } = hasEslint ? readEslint(projectRoot, file, linter) : { mapped: mapBiomeRules(projectRoot), warnings: [] };
   const source = hasEslint ? "eslint --print-config" : "biome.json";
   return { found: Object.fromEntries(Object.entries(mapped).map(([key, value]) => [key, { value, source }])), warnings };
 }
 
 export async function scanConventions(
   projectRoot: string,
-  current: { config: ConfigProject; raw: Record<string, unknown> },
+  current: { config: ConfigProject; raw: Record<string, unknown>; linter?: boolean },
 ): Promise<{ profile: Partial<ConfigProject>; sources: Record<string, string>; warnings: string[] }> {
-  const { config, raw } = current;
+  const { config, raw, linter = true } = current;
   const files = isRepository(projectRoot) ? listAllSourceFiles(projectRoot) : walkFiles(projectRoot, "").sort();
   const root = CONVENTIONS_SOURCE_ROOTS.find((name) => existsSync(join(projectRoot, name)) && statSync(join(projectRoot, name)).isDirectory()) ?? ".";
   const found: Record<string, { value: unknown; source: string }> = {
@@ -204,7 +213,7 @@ export async function scanConventions(
   found.entityPrefix = { value: entityPrefix.value === "true", source: entityPrefix.source };
   const prefix = scanConfig.sourceRoot === "." ? "" : `${scanConfig.sourceRoot}/`;
   const linted = files.find((file) => file.startsWith(prefix) && describeTest(file) === null) ?? files[0];
-  const linters = scanLinters(projectRoot, linted);
+  const linters = scanLinters(projectRoot, linted, linter);
   Object.assign(found, linters.found);
   const profile: Record<string, unknown> = {};
   const sources: Record<string, string> = {};

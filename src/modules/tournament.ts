@@ -300,6 +300,9 @@ async function evaluateVariant(
 
 export async function runTournament(directory: string, config: ConfigProject): Promise<TournamentResult> {
   const target = JSON.parse(readFileSync(join(directory, "target.json"), "utf8")) as { file: string; functionName: string };
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(String(target.functionName))) {
+    throw new Error("target.json functionName must be an identifier");
+  }
   const casesModule = (await import(pathToFileURL(join(directory, "cases.ts")).href)) as { benchmark?: boolean };
   const options = { functionName: target.functionName, benchmark: casesModule.benchmark !== false };
   const variants: TournamentVariantResult[] = [];

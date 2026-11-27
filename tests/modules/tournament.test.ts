@@ -512,3 +512,14 @@ test("findCandidates takes a function by body lines alone and drops it below bot
   assert.deepEqual(listed.map(({ functionName, lines }) => `${functionName} ${lines}`), ["scoreValues 9"]);
   assert.deepEqual(await findCandidates({ projectRoot: directory, config: tooShort }), []);
 });
+
+test("runTournament refuses a functionName that is not an identifier", async () => {
+  const directory = copyFixture("tournament/good");
+  try {
+    writeFileSync(join(directory, "target.json"), "{\"file\":\"src/math.ts\",\"functionName\":\"sumList --inspect\"}\n");
+    await assert.rejects(runTournament(directory, CONFIG_DEFAULTS), /functionName must be an identifier/);
+    assert.equal(existsSync(join(directory, "result.json")), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

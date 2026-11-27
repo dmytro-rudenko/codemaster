@@ -49,7 +49,7 @@ claude --plugin-dir <path>
 
 ## Configuration
 
-`.codemaster.json` in the project root is optional. Without it, the first hook run scans the project and writes the profile (the `sourceRoot`, the folder names of each role, the test location and suffix, the naming conventions, and the limits found in an ESLint or Biome config). Each written field has its source in `sources`: a config path, `dominant 83% (41/49)` or `default`. The profile is printed at the top of the first report; correct the file if something is wrong. A field written by hand is never overwritten.
+`.codemaster.json` in the project root is optional. Without it, the first hook run scans the project and writes the profile (the `sourceRoot`, the folder names of each role, the test location and suffix, the naming conventions, and the limits found in a Biome config). The hook never runs the project's own ESLint, because that would execute repository code; run `conventions --refresh` yourself to import ESLint limits. Each written field has its source in `sources`: a config path, `dominant 83% (41/49)` or `default`. The profile is printed at the top of the first report; correct the file if something is wrong. A field written by hand is never overwritten.
 
 ```json
 {

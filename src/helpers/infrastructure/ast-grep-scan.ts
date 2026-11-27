@@ -45,7 +45,7 @@ function runRule(input: { rulePath: string; projectRoot: string; files: string[]
   const { rulePath, projectRoot, files } = input;
   const { stdout } = runProcess(
     resolveAstGrepBinary(),
-    ["scan", "--rule", rulePath, "--json=stream", ...files],
+    ["scan", "--rule", rulePath, "--json=stream", "--", ...files],
     { cwd: projectRoot },
   );
   return stdout
