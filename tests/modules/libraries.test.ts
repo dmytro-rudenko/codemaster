@@ -1,12 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { CONFIG_DEFAULTS } from "../../src/consts/config.ts";
+import type { CommandContext } from "../../src/interfaces/command.ts";
 import type { ConfigProject } from "../../src/interfaces/config.ts";
 import type { LibraryDiff } from "../../src/interfaces/library.ts";
-import { diffLibraries, formatLibraryDiff, rebuildIndex } from "../../src/modules/libraries.ts";
+import { diffLibraries, formatLibraryDiff, rebuildIndex, runCommand } from "../../src/modules/libraries.ts";
 
 const summaryDirectory = ".claude/skills/codemaster-libraries";
 
@@ -15,6 +16,7 @@ interface ProjectSpec {
   devDependencies?: Record<string, string>;
   installed?: Record<string, Record<string, string>>;
   readmes?: string[];
+  files?: Record<string, string>;
   summaries?: Record<string, string>;
 }
 
@@ -36,6 +38,9 @@ function createProject(spec: ProjectSpec): string {
   }
   for (const name of spec.readmes ?? []) {
     writeProjectFile(directory, `node_modules/${name}/README.md`, `# ${name}\n`);
+  }
+  for (const [path, text] of Object.entries(spec.files ?? {})) {
+    writeProjectFile(directory, path, text);
   }
   for (const [fileName, text] of Object.entries(spec.summaries ?? {})) {
     writeProjectFile(directory, `${summaryDirectory}/${fileName}`, text);
@@ -277,4 +282,285 @@ test("rebuildIndex does not list SKILL.md itself on a second run", () => {
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+function createContext(directory: string, argumentsList: string[], overrides: Partial<ConfigProject> = {}): CommandContext {
+  return {
+    argumentsList,
+    projectRoot: directory,
+    config: settingsWith(overrides),
+    configWarnings: [],
+    input: "",
+    pluginRoot: directory,
+  };
+}
+
+async function runCaptured(context: CommandContext): Promise<{ status: number; stdout: string; stderr: string }> {
+  const writeOut = process.stdout.write;
+  const writeErr = process.stderr.write;
+  let stdout = "";
+  let stderr = "";
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    stdout += String(chunk);
+    return true;
+  }) as typeof process.stdout.write;
+  process.stderr.write = ((chunk: string | Uint8Array) => {
+    stderr += String(chunk);
+    return true;
+  }) as typeof process.stderr.write;
+  try {
+    const status = await runCommand(context);
+    return { status, stdout, stderr };
+  } finally {
+    process.stdout.write = writeOut;
+    process.stderr.write = writeErr;
+  }
+}
+
+function createPruneProject(): string {
+  return createProject({
+    dependencies: { beta: "^2.0.0" },
+    installed: { beta: { version: "2.1.0" } },
+    summaries: {
+      "beta.md": summaryText("beta", "1.0.0", "Beta parses things."),
+      "zeta.md": summaryText("zeta", "3.0.0", "Zeta is gone."),
+    },
+  });
+}
+
+function readIndex(directory: string): string {
+  return readFileSync(join(directory, summaryDirectory, "SKILL.md"), "utf8");
+}
+
+function refusesToWrite(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith("refusing to write");
+}
+
+test("runCommand --prune deletes the remove files and rebuilds the index", async () => {
+  const directory = createPruneProject();
+  try {
+    const result = await runCaptured(createContext(directory, ["--prune"]));
+    assert.equal(result.status, 0);
+    assert.equal(existsSync(join(directory, summaryDirectory, "zeta.md")), false);
+    assert.equal(existsSync(join(directory, summaryDirectory, "beta.md")), true);
+    assert.match(readIndex(directory), /\[beta\]\(beta\.md\)/);
+    assert.doesNotMatch(readIndex(directory), /zeta/);
+    const lines = result.stdout.split("\n");
+    assert.ok(lines.includes("remove zeta"), result.stdout);
+    assert.ok(lines.includes("stale beta 1.0.0 -> 2.1.0"), result.stdout);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("runCommand --index only rebuilds the index", async () => {
+  const directory = createPruneProject();
+  try {
+    const result = await runCaptured(createContext(directory, ["--index"]));
+    assert.equal(result.status, 0);
+    assert.equal(existsSync(join(directory, summaryDirectory, "zeta.md")), true);
+    assert.match(readIndex(directory), /\[beta\]\(beta\.md\)/);
+    assert.match(readIndex(directory), /\[zeta\]\(zeta\.md\)/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("runCommand --prune --index does both", async () => {
+  const directory = createPruneProject();
+  try {
+    const result = await runCaptured(createContext(directory, ["--prune", "--index"]));
+    assert.equal(result.status, 0);
+    assert.equal(existsSync(join(directory, summaryDirectory, "zeta.md")), false);
+    assert.match(readIndex(directory), /\[beta\]\(beta\.md\)/);
+    assert.doesNotMatch(readIndex(directory), /zeta/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("runCommand with libraryDigest false prints disabled and touches nothing", async () => {
+  const directory = createPruneProject();
+  try {
+    const result = await runCaptured(createContext(directory, ["--prune", "--index"], { libraryDigest: false }));
+    assert.equal(result.status, 0);
+    assert.equal(result.stdout.trim(), "libraries: disabled");
+    assert.equal(existsSync(join(directory, summaryDirectory, "zeta.md")), true);
+    assert.equal(existsSync(join(directory, summaryDirectory, "SKILL.md")), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("rebuildIndex refuses a symlinked skill directory and leaves the target untouched", () => {
+  const directory = createProject({});
+  const outside = mkdtempSync(join(tmpdir(), "codemaster-outside-"));
+  try {
+    mkdirSync(join(directory, ".claude/skills"), { recursive: true });
+    symlinkSync(outside, join(directory, summaryDirectory));
+    assert.throws(() => rebuildIndex(directory), refusesToWrite);
+    assert.equal(existsSync(join(outside, "SKILL.md")), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("rebuildIndex refuses a symlinked SKILL.md and leaves the target untouched", () => {
+  const directory = createProject({ summaries: { "alpha.md": summaryText("alpha", "1.0.0") } });
+  const outside = mkdtempSync(join(tmpdir(), "codemaster-outside-"));
+  const target = join(outside, "target.md");
+  try {
+    writeFileSync(target, "keep");
+    symlinkSync(target, join(directory, summaryDirectory, "SKILL.md"));
+    assert.throws(() => rebuildIndex(directory), refusesToWrite);
+    assert.equal(readFileSync(target, "utf8"), "keep");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("rebuildIndex refuses a path whose real location is outside the project", () => {
+  const directory = createProject({});
+  const outside = mkdtempSync(join(tmpdir(), "codemaster-outside-"));
+  try {
+    mkdirSync(join(outside, "skills/codemaster-libraries"), { recursive: true });
+    symlinkSync(outside, join(directory, ".claude"));
+    assert.throws(() => rebuildIndex(directory), refusesToWrite);
+    assert.equal(existsSync(join(outside, "skills/codemaster-libraries/SKILL.md")), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("runCommand reports a refused write on stderr, returns 0 and prunes nothing outside", async () => {
+  const directory = createProject({});
+  const outside = mkdtempSync(join(tmpdir(), "codemaster-outside-"));
+  try {
+    writeFileSync(join(outside, "zeta.md"), summaryText("zeta", "3.0.0"));
+    mkdirSync(join(directory, ".claude/skills"), { recursive: true });
+    symlinkSync(outside, join(directory, summaryDirectory));
+    const result = await runCaptured(createContext(directory, ["--prune", "--index"]));
+    assert.equal(result.status, 0);
+    assert.ok(result.stderr.startsWith("codemaster: refusing to write"), result.stderr);
+    assert.equal(existsSync(join(outside, "zeta.md")), true);
+    assert.equal(existsSync(join(outside, "SKILL.md")), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("a declared name outside npm's grammar is never read and is missing", () => {
+  const manifest = JSON.stringify({ version: "9.9.9" });
+  const diff = runDiff({
+    dependencies: { "../outside": "1.0.0", "a/b/c": "1.0.0", "@x/../y": "1.0.0", alpha: "^1.0.0" },
+    installed: { alpha: { version: "1.0.0" } },
+    files: {
+      "outside/package.json": manifest,
+      "node_modules/a/b/c/package.json": manifest,
+      "node_modules/y/package.json": manifest,
+    },
+  });
+  assert.deepEqual(diff.add.map((entry) => entry.name), ["alpha"]);
+  assert.deepEqual(diff.missing.toSorted(), ["../outside", "@x/../y", "a/b/c"].toSorted());
+  assert.ok(formatLibraryDiff(diff).includes("missing ../outside (not installed)"));
+});
+
+test("the first existing readme spelling is reported", () => {
+  const names = ["a-upper", "b-lower", "c-mixed", "d-bare", "e-both", "f-none", "g-all"];
+  const diff = runDiff(
+    {
+      dependencies: Object.fromEntries(names.map((name) => [name, "^1.0.0"])),
+      installed: Object.fromEntries(names.map((name) => [name, { version: "1.0.0" }])),
+      files: {
+        "node_modules/a-upper/README.md": "",
+        "node_modules/b-lower/readme.md": "",
+        "node_modules/c-mixed/Readme.md": "",
+        "node_modules/d-bare/README": "",
+        "node_modules/e-both/README": "",
+        "node_modules/e-both/readme.md": "",
+        "node_modules/g-all/README": "",
+        "node_modules/g-all/Readme.md": "",
+        "node_modules/g-all/readme.md": "",
+        "node_modules/g-all/README.md": "",
+      },
+    },
+    { libraryDigestPerRun: 10 },
+  );
+  assert.deepEqual(Object.fromEntries(diff.add.map((entry) => [entry.name, entry.readme])), {
+    "a-upper": "node_modules/a-upper/README.md",
+    "b-lower": "node_modules/b-lower/readme.md",
+    "c-mixed": "node_modules/c-mixed/Readme.md",
+    "d-bare": "node_modules/d-bare/README",
+    "e-both": "node_modules/e-both/readme.md",
+    "f-none": null,
+    "g-all": "node_modules/g-all/README.md",
+  });
+});
+
+test("mixed-case package names are listed and traversal names stay missing", () => {
+  const manifest = JSON.stringify({ version: "9.9.9" });
+  const diff = runDiff({
+    dependencies: { JSONStream: "^1.3.0", Base64: "^1.0.0", "../Outside": "1.0.0", "@X/../Y": "1.0.0" },
+    installed: { JSONStream: { version: "1.3.5" }, Base64: { version: "1.0.1" } },
+    files: { "Outside/package.json": manifest, "node_modules/Y/package.json": manifest },
+  });
+  assert.deepEqual(diff.add.map((entry) => `${entry.name} ${entry.version}`), ["Base64 1.0.1", "JSONStream 1.3.5"]);
+  assert.deepEqual(diff.missing.toSorted(), ["../Outside", "@X/../Y"].toSorted());
+});
+
+test("a summary without frontmatter name maps scope__pkg.md back to @scope/pkg", () => {
+  const diff = runDiff({ summaries: { "scope__pkg.md": "## Purpose\nScoped helpers.\n" } });
+  assert.deepEqual(diff.remove, ["@scope/pkg"]);
+});
+
+test("prune deletes the summary of a removed package but not a declared one that shares its frontmatter name", async () => {
+  const directory = createProject({
+    dependencies: { alpha: "^1.0.0" },
+    installed: { alpha: { version: "1.0.0" } },
+    summaries: {
+      "alpha.md": summaryText("zeta", "1.0.0"),
+      "zeta.md": summaryText("zeta", "3.0.0"),
+    },
+  });
+  try {
+    const result = await runCaptured(createContext(directory, ["--prune"]));
+    assert.equal(result.status, 0);
+    assert.equal(existsSync(join(directory, summaryDirectory, "alpha.md")), true);
+    assert.equal(existsSync(join(directory, summaryDirectory, "zeta.md")), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("prune deletes an orphaned file whose frontmatter name matches a declared package", async () => {
+  const directory = createProject({
+    dependencies: { alpha: "^1.0.0" },
+    installed: { alpha: { version: "1.0.0" } },
+    summaries: {
+      "alpha.md": summaryText("alpha", "1.0.0"),
+      "old.md": summaryText("alpha", "1.0.0"),
+    },
+  });
+  try {
+    const result = await runCaptured(createContext(directory, ["--prune"]));
+    assert.equal(result.status, 0);
+    assert.equal(existsSync(join(directory, summaryDirectory, "alpha.md")), true);
+    assert.equal(existsSync(join(directory, summaryDirectory, "old.md")), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("a summary with CRLF line endings keeps its frontmatter", () => {
+  const summaries = { "beta.md": summaryText("beta", "1.2.0").replaceAll("\n", "\r\n") };
+  const same = runDiff({ dependencies: { beta: "^1.0.0" }, installed: { beta: { version: "1.2.0" } }, summaries });
+  assert.deepEqual(same.stale, []);
+  assert.deepEqual(same.add, []);
+  assert.deepEqual(same.remove, []);
+  const newer = runDiff({ dependencies: { beta: "^2.0.0" }, installed: { beta: { version: "2.0.0" } }, summaries });
+  assert.deepEqual(newer.stale, [{ name: "beta", previous: "1.2.0", current: "2.0.0" }]);
 });
