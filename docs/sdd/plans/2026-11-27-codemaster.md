@@ -267,16 +267,16 @@ These utils:
 - `src/utils/glob.ts`: `matchesGlob(path: string, pattern: string): boolean`, which wraps `node:path` `matchesGlob`.
 - `src/utils/hash.ts`: `hashText(text: string): string`, the sha256 hex.
 
-- [ ] Step 1: write `tests/utils/*.test.ts` with these cases:
+- [x] Step 1: write `tests/utils/*.test.ts` with these cases:
   - `splitWords("userMaxAge")`→`["user","max","age"]`, `splitWords("USER_MAX_AGE")`→`["user","max","age"]`, `splitWords("HTTPServer")`→`["http","server"]`;
   - `toEntityCase("order-item","upper-snake")`→`"ORDER_ITEM"`;
   - `matchesGlob("bin/a.ts","bin/*.ts")`→`true`;
   - `hashText("a")` has length 64.
-- [ ] Step 2: `node --test "tests/utils/*.test.ts"` → fails because the modules are missing.
-- [ ] Step 3: write every file listed in Writes.
+- [x] Step 2: `node --test "tests/utils/*.test.ts"` → fails because the modules are missing.
+- [x] Step 3: write every file listed in Writes.
   - `package.json`: `{"name":"codemaster","version":"0.1.0","private":true,"type":"module","engines":{"node":">=22.18"},"scripts":{"test":"node --test \"tests/acceptance/*.test.ts\" \"tests/modules/*.test.ts\" \"tests/helpers/**/*.test.ts\" \"tests/utils/*.test.ts\""}}`.
   - `.gitignore`: `node_modules/`, `.metrics/`, `coverage/`, `.codemaster.local.json`.
-- [ ] Step 4: `node --test "tests/utils/*.test.ts"` → `ℹ fail 0`.
+- [x] Step 4: `node --test "tests/utils/*.test.ts"` → `ℹ fail 0`.
 
 ---
 
