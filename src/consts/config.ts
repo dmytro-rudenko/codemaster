@@ -13,6 +13,7 @@ export const CONFIG_DEFAULTS: ConfigProject = {
   hook: true,
   layout: "auto",
   sourceRoot: "src",
+  exclude: [],
   entrypoints: ["src/index.ts", "src/main.ts", "bin/*.ts"],
   singleFileMaxLines: 150,
   coverageCommand: null,

@@ -29,7 +29,8 @@ export interface ConfigTournament {
 export interface ConfigProject {
   hook: boolean;
   layout: ConfigLayout;
-  sourceRoot: string;
+  sourceRoot: string | string[];
+  exclude: string[];
   entrypoints: string[];
   singleFileMaxLines: number;
   coverageCommand: string | null;

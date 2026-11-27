@@ -57,9 +57,6 @@ function keepValidRules(rules: Record<string, unknown>, warnings: string[]): Rec
 }
 
 function findValueProblem(field: string, value: unknown): string | null {
-  if (field === "sourceRoot") {
-    return isRelativePath(value) ? null : "expected a relative path";
-  }
   const allowedValues: Record<string, string[]> = {
     layout: ["auto", "modular", "layered", "off"],
     testSuffix: ["test", "spec"],
@@ -79,6 +76,14 @@ function findValueProblem(field: string, value: unknown): string | null {
 
 function mergeValue(base: unknown, override: unknown, field: string, warnings: string[]): unknown {
   if (override === undefined) {
+    return base;
+  }
+  if (field === "sourceRoot") {
+    const roots = [override].flat();
+    if (roots.length > 0 && roots.every(isRelativePath)) {
+      return override;
+    }
+    warnings.push(`warning config ${field}: expected a relative path`);
     return base;
   }
   if (field === "coverageCommand") {
@@ -137,6 +142,10 @@ export function loadConfig(projectRoot: string): { config: ConfigProject; warnin
     merged = mergeValue(merged, readConfigFile(join(projectRoot, name), name, warnings), "", warnings);
   }
   return { config: merged as ConfigProject, warnings, exists: existsSync(join(projectRoot, CONFIG_FILE_NAME)) };
+}
+
+export function listSourceRoots(config: ConfigProject): string[] {
+  return [config.sourceRoot].flat().map((root) => root.replaceAll("\\", "/").replace(/^\.(\/|$)/, "").replace(/\/+$/, ""));
 }
 
 export function resolveTestsLocation(config: ConfigProject, layout: RoleLayout): string {

@@ -373,3 +373,13 @@ test("simple-package: a package.json holding null has no findings", () => {
 test("simple-package: an invalid package.json has no findings", () => {
   assert.deepEqual(packageFindings('{ "dependencies": { "axios": '), []);
 });
+
+test("test-mirror: with a list of source roots the tests path is relative to the root holding the file", () => {
+  const findings = mirrorFindings(
+    { "api/src/modules/user.ts": "" },
+    roleOf("api/src/modules/user.ts", "module"),
+    "layered",
+    { sourceRoot: ["web/src", "api/src"] },
+  );
+  assert.equal(findings[0].message, "missing test tests/modules/user.test.ts");
+});

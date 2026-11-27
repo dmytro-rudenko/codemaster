@@ -115,6 +115,29 @@ test("sourceRoot picks the first existing of src, app, server, lib", async () =>
   });
 });
 
+test("a monorepo without a root source folder gets one source root per package", async () => {
+  const files = {
+    "api/package.json": "{}\n",
+    "api/services/user.ts": "export {};\n",
+    "web/package.json": "{}\n",
+    "web/src/pages/home.ts": "export {};\n",
+    "docs/proto/page.ts": "export {};\n",
+  };
+  await withProject(files, async (directory) => {
+    const { profile, sources } = await scan(directory);
+    assert.deepEqual(profile.sourceRoot, ["api", "web/src"]);
+    assert.equal(sources.sourceRoot, "packages: api, web");
+  });
+});
+
+test("excluded files stay out of the convention scan", async () => {
+  const files = { ...numberedFiles("docs/proto/page", ".spec.ts", 5), "src/a.test.ts": "export {};\n" };
+  await withProject(files, async (directory) => {
+    const { profile } = await scan(directory, { exclude: ["docs/**"] });
+    assert.equal(profile.testSuffix, CONFIG_DEFAULTS.testSuffix);
+  });
+});
+
 test("sourceRoot falls back to the project root without any source folder", async () => {
   await withProject({ "index.ts": "export {};\n" }, async (directory) => {
     const { profile } = await scan(directory);

@@ -2,18 +2,20 @@ import { existsSync } from "node:fs";
 import { extname, join, posix } from "node:path";
 import { CHECK_SOURCE_EXTENSIONS } from "../../consts/check.ts";
 import { readJsonFile, readTextFile } from "../infrastructure/filesystem.ts";
-import { resolveTestsLocation } from "../../modules/config.ts";
+import { listSourceRoots, resolveTestsLocation } from "../../modules/config.ts";
 import type { ConfigProject } from "../../interfaces/config.ts";
 import type { FindingItem } from "../../interfaces/finding.ts";
 import type { RoleFile, RoleLayout } from "../../interfaces/role.ts";
 
-function mirrorDirectory(path: string, location: string, sourceRoot: string): string {
+function mirrorDirectory(path: string, location: string, roots: string[]): string {
   const directory = posix.dirname(path);
   if (location === "colocated") {
     return directory;
   }
-  const prefix = `${sourceRoot}/`;
-  const relative = directory === sourceRoot ? "." : directory.startsWith(prefix) ? directory.slice(prefix.length) : directory;
+  const holding = roots
+    .filter((root) => root === "" || directory === root || directory.startsWith(`${root}/`))
+    .sort((left, right) => right.length - left.length)[0];
+  const relative = holding === undefined || holding === "" ? directory : posix.relative(holding, directory) || ".";
   return posix.join(location, relative);
 }
 
@@ -33,7 +35,7 @@ export function checkTestMirror(input: {
   const extension = extname(path);
   const name = posix.basename(path, extension);
   const location = resolveTestsLocation(config, layout);
-  const directory = mirrorDirectory(path, location, config.sourceRoot);
+  const directory = mirrorDirectory(path, location, listSourceRoots(config));
   const otherSuffix = config.testSuffix === "test" ? "spec" : "test";
   const expected = posix.join(directory, `${name}.${config.testSuffix}${extension}`);
   const found = [config.testSuffix, otherSuffix].some((suffix) =>

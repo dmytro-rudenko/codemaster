@@ -116,6 +116,21 @@ test("an unparsable file gives one parse warning and the other files are still c
   assert.ok(triplesOf(findings).includes("max-params src/pages/home.ts:1"), triplesOf(findings).join("\n"));
 });
 
+test("a typeof import type argument in a call is parsed and checked on its own line", async () => {
+  const text = 'const mocked = await importOriginal<typeof import("./home.ts")>();\n' + sixParameters;
+  const { findings } = await checkProject({ "src/pages/mocked.ts": text });
+  assert.deepEqual(triplesOf(findings), ["max-params src/pages/mocked.ts:2"]);
+});
+
+test("files matching an exclude glob are left out of the check", async () => {
+  const { findings, summary } = await checkProject(
+    { "docs/proto/page.ts": sixParameters, "site/js/vendor.js": sixParameters, "src/pages/home.ts": sixParameters },
+    { exclude: ["docs/**", "site/js/*.js"] },
+  );
+  assert.deepEqual(triplesOf(findings), ["max-params src/pages/home.ts:1"]);
+  assert.equal(summary.files, 1);
+});
+
 test("a file that cannot be read gives a warning and the other files are still checked", async () => {
   const projectRoot = createProject({ "src/pages/home.ts": sixParameters, "src/pages/folder.js/inner.ts": "export const a = 1;\n" });
   const files = ["src/pages/folder.js", "src/pages/gone.ts", "src/pages/home.ts"];

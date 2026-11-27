@@ -66,7 +66,8 @@ README.md                         англійською
 |---|---|---|
 | `hook` | boolean | `true` |
 | `layout` | `"auto" \| "modular" \| "layered" \| "off"` | `"auto"` |
-| `sourceRoot` | string | `"src"` |
+| `sourceRoot` | string або string[] (корені пакетів монорепо) | `"src"` |
+| `exclude` | string[] (glob) — файли, яких не торкаються `check`, хук і `conventions` | `[]` |
 | `entrypoints` | string[] (glob) | `["src/index.ts", "src/main.ts", "bin/*.ts"]` |
 | `singleFileMaxLines` | number | `150` |
 | `coverageCommand` | string | автовизначення (3.11) |
@@ -92,13 +93,13 @@ README.md                         англійською
 
 `.codemaster.local.json` поруч (той самий формат, поля перекривають `.codemaster.json`) — особисті перемикачі розробника; `install` нічого не робить із `.gitignore`, а скіл при першому створенні локального файлу додає його в `.gitignore` проєкту. *(Моє рішення: щоб один розробник не вимикав функцію всій команді.)*
 
-**Визначення розкладу при `auto`:** якщо в `sourceRoot` є папки щонайменше двох різних ролей з `roles` (наприклад `services` і `types`) — `layered`; інакше якщо хоча б одна папка в `sourceRoot` містить файл чи папку з роллю `interfaces`, `consts` або `helper` (3.3) — `modular`; інакше — `off`. При `off` правила розкладу (`layout-forbidden-declaration`, `helpers-only-functions`, `test-mirror`, `helpers-mixed-kind`, `name-entity-prefix`, `single-file-module-size`) не застосовуються, решта правил працює. *(Моє рішення.)*
+**Визначення розкладу при `auto`:** якщо в `sourceRoot` (при списку — в усіх коренях разом) є папки щонайменше двох різних ролей з `roles` (наприклад `services` і `types`) — `layered`; інакше якщо хоча б одна папка в `sourceRoot` містить файл чи папку з роллю `interfaces`, `consts` або `helper` (3.3) — `modular`; інакше — `off`. При `off` правила розкладу (`layout-forbidden-declaration`, `helpers-only-functions`, `test-mirror`, `helpers-mixed-kind`, `name-entity-prefix`, `single-file-module-size`) не застосовуються, решта правил працює. *(Моє рішення.)*
 
 ### 3.2a. `codemaster conventions [--refresh]` — профіль проєкту
 
 Запускається автоматично на першому прогоні хука, коли `.codemaster.json` немає, і вручну з `--refresh`. Сканує проєкт і записує профіль у `.codemaster.json`. Поле, яке вже є у файлі без запису в `sources` (його заповнив користувач), сканер ніколи не перезаписує. Для кожного записаного поля в `sources` фіксується джерело: шлях конфігу (`eslint.config.js`), `dominant 83% (41/49)` або `default`.
 
-- **`sourceRoot`:** перша наявна з `src`, `app`, `server`, `lib`; інакше `.`.
+- **`sourceRoot`:** перша наявна з `src`, `app`, `server`, `lib`; інакше — монорепо: список коренів, по одному на кожну папку верхнього рівня з `package.json` (її `src`, `app`, `server` чи `lib`, якщо є, інакше сама папка), джерело `packages: <назви>`; без таких папок — `.`.
 - **`roles`:** для кожної ролі — ті псевдоніми, які справді є як папки в `sourceRoot` або в папках сутностей (як папка чи ім'я файлу з 3.3):
   - `module` — `modules`, `services`, `controllers`, `features`, `domains`, `handlers`;
   - `interfaces` — `interfaces`, `types`, `typings`, `contracts`, `dto`;
@@ -137,7 +138,8 @@ README.md                         англійською
 - **modular:** `utils/` → `util`. У папці сутності `<entity>/` роль визначає розпізнавання імені. Сутність — ім'я папки. Файл прямо в `sourceRoot` (не в папці) → `single-file-module`. Папка сутності `global` або `shared` — глобальна: правило `name-entity-prefix` до неї не застосовується.
 - Файли тестів (`*.test.*`, `*.spec.*`, усе в папці `testsLocation`, `tests/`, `test/`, `__tests__/`) — роль `test`, правила розкладу до них не застосовуються, крім `test-mirror`.
 - Файл, що відповідає glob з `entrypoints`, — роль `entrypoint`.
-- Файл поза `sourceRoot` і не з `entrypoints` (конфіги, скрипти) — роль `other`: працюють лише правила імен, параметрів, вкладеності й деструктуризації.
+- При списку `sourceRoot` роль файлу визначається відносно найглибшого кореня, що його містить.
+- Файл поза `sourceRoot` і не з `entrypoints` (конфіги, скрипти) — роль `other`: працюють лише правила імен, параметрів, вкладеності й деструктуризації, а також `global-function`.
 
 ### 3.4. `codemaster check [paths...] [--json]`
 

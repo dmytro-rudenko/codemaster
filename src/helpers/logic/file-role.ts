@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { CONVENTIONS_TEST_FOLDERS } from "../../consts/conventions.ts";
 import { ROLES_FILE_NAMES, ROLES_GLOBAL_NAMES } from "../../consts/roles.ts";
 import { matchesGlob } from "../../utils/glob.ts";
+import { listSourceRoots } from "../../modules/config.ts";
 import type { ConfigProject, ConfigRoles } from "../../interfaces/config.ts";
 import type { RoleFile, RoleLayout, RoleName } from "../../interfaces/role.ts";
 
@@ -51,12 +52,13 @@ function isTestPath(normalized: string, config: ConfigProject): boolean {
   return location !== "" && (normalized === location || normalized.startsWith(`${location}/`));
 }
 
-function relativeSegments(normalized: string, sourceRoot: string): string[] | null {
+function relativeSegments(normalized: string, config: ConfigProject): string[] | null {
   const segments = normalized.split("/");
-  const rootSegments = normalizePath(sourceRoot).split("/").filter((part) => part !== "" && part !== ".");
-  const inside =
-    segments.length > rootSegments.length && rootSegments.every((part, position) => segments[position] === part);
-  return inside ? segments.slice(rootSegments.length) : null;
+  const holding = listSourceRoots(config)
+    .map((root) => root.split("/").filter((part) => part !== ""))
+    .filter((root) => segments.length > root.length && root.every((part, position) => segments[position] === part))
+    .sort((left, right) => right.length - left.length);
+  return holding.length === 0 ? null : segments.slice(holding[0].length);
 }
 
 function resolveLayered(relative: string[], config: ConfigProject): Omit<RoleFile, "path"> {
@@ -101,7 +103,7 @@ export function resolveFileRole(path: string, options: { layout: RoleLayout; con
   if (config.entrypoints.some((pattern) => matchesGlob(normalized, pattern))) {
     return { path, role: "entrypoint", entity: null, global: false };
   }
-  const relative = relativeSegments(normalized, config.sourceRoot);
+  const relative = relativeSegments(normalized, config);
   if (relative === null) {
     return { path, role: "other", entity: null, global: false };
   }
@@ -123,16 +125,17 @@ export function detectLayout(projectRoot: string, config: ConfigProject): RoleLa
   if (config.layout !== "auto") {
     return config.layout;
   }
-  const root = join(projectRoot, config.sourceRoot);
-  if (!existsSync(root) || !statSync(root).isDirectory()) {
-    return "off";
-  }
-  const folders = readdirSync(root, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name);
-  const roles = new Set(folders.map((folder) => aliasRole(folder, config.roles)).filter((role) => role !== null));
+  const roots = listSourceRoots(config)
+    .map((root) => join(projectRoot, root))
+    .filter((root) => existsSync(root) && statSync(root).isDirectory());
+  const folders = roots.flatMap((root) =>
+    readdirSync(root, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => ({ name: entry.name, path: join(root, entry.name) })),
+  );
+  const roles = new Set(folders.map(({ name }) => aliasRole(name, config.roles)).filter((role) => role !== null));
   if (roles.size >= 2) {
     return "layered";
   }
-  return folders.some((folder) => holdsRoleFile(join(root, folder), config)) ? "modular" : "off";
+  return folders.some(({ path }) => holdsRoleFile(path, config)) ? "modular" : "off";
 }
