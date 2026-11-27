@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { INSTALL_AST_GREP_VERSION } from "../../src/consts/install.ts";
@@ -63,6 +63,19 @@ async function withFakeNpm(
     rmSync(root, { recursive: true, force: true });
   }
 }
+
+async function withUnwritableDataDirectory(body: () => void | Promise<void>): Promise<void> {
+  const root = mkdtempSync(join(tmpdir(), "codemaster-install-"));
+  chmodSync(root, 0o555);
+  try {
+    await withVariables({ CODEMASTER_DATA_DIR: join(root, "data") }, body);
+  } finally {
+    chmodSync(root, 0o755);
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+const RUNS_AS_ROOT = process.getuid?.() === 0;
 
 function writeManifest(dataDirectory: string, packageName: string, content: string): void {
   const packageDirectory = join(dataDirectory, "node_modules", packageName);
@@ -227,3 +240,37 @@ test("runCommand prints nothing and resolves to 0 when already installed", async
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test(
+  "ensureInstalled reports a failed install when the data directory cannot be created",
+  { skip: RUNS_AS_ROOT },
+  async () => {
+    await withUnwritableDataDirectory(() => {
+      const outcome = ensureInstalled();
+      assert.equal(outcome.ok, false);
+      assert.ok(
+        outcome.message?.startsWith("codemaster: install failed ("),
+        `unexpected message: ${outcome.message}`,
+      );
+    });
+  },
+);
+
+test(
+  "runCommand resolves to 0 when the data directory cannot be created",
+  { skip: RUNS_AS_ROOT },
+  async () => {
+    await withUnwritableDataDirectory(async () => {
+      let exitCode = -1;
+      const written = await captureStderr(async () => {
+        exitCode = await runCommand();
+      });
+      assert.equal(exitCode, 0);
+      assert.equal(written.length, 1);
+      assert.ok(
+        written[0]?.startsWith("codemaster: install failed ("),
+        `unexpected stderr: ${written[0]}`,
+      );
+    });
+  },
+);

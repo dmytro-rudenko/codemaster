@@ -40,7 +40,12 @@ export function ensureInstalled(): { ok: boolean; message: string | null } {
   if (isInstalled()) {
     return { ok: true, message: null };
   }
-  mkdirSync(dataDirectory, { recursive: true });
+  try {
+    mkdirSync(dataDirectory, { recursive: true });
+  } catch (error) {
+    const failure = error instanceof Error ? error.message : String(error);
+    return { ok: false, message: `codemaster: install failed (${failure.split("\n")[0]})` };
+  }
   const outcome = spawnSync(
     "npm",
     ["install", "--prefix", dataDirectory, "--no-save", "--no-audit", "--no-fund", "--fetch-retries=1", "--fetch-timeout=20000", ...INSTALL_PACKAGES],
