@@ -100,6 +100,19 @@ test("listChangedFiles on main without another base lists uncommitted and untrac
   }
 });
 
+test("listChangedFiles in a repository without commits lists staged and untracked files", () => {
+  const directory = mkdtempSync(join(tmpdir(), "codemaster-"));
+  try {
+    runGit(directory, ["init", "-q", "-b", "main"]);
+    writeProjectFile(directory, "staged.ts", "export const STAGED = 1;\n");
+    runGit(directory, ["add", "staged.ts"]);
+    writeProjectFile(directory, "new.ts", "export const NEW = 1;\n");
+    assert.deepEqual(listChangedFiles(directory), ["new.ts", "staged.ts"]);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("listAllSourceFiles includes tracked and untracked sources with the same filters", () => {
   const directory = createWorkBranch();
   try {

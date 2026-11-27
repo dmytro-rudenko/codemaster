@@ -34,7 +34,8 @@ function findDiffBase(directory: string): string | null {
 
 function listChangedPaths(directory: string): string[] {
   const base = findDiffBase(directory);
-  const changed = base === null ? [] : splitNullSeparated(runGit(directory, ["diff", "--name-only", "-z", "--relative", base]));
+  const changedArguments = base === null ? ["ls-files", "-z", "--cached"] : ["diff", "--name-only", "-z", "--relative", base];
+  const changed = splitNullSeparated(runGit(directory, changedArguments));
   const untracked = splitNullSeparated(runGit(directory, ["ls-files", "-z", "--others", "--exclude-standard"]));
   return [...changed, ...untracked];
 }

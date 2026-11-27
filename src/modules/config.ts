@@ -17,6 +17,24 @@ function describeType(value: unknown): string {
   return Array.isArray(value) ? "array" : typeof value;
 }
 
+function findValueProblem(field: string, value: unknown): string | null {
+  const allowedValues: Record<string, string[]> = {
+    layout: ["auto", "modular", "layered", "off"],
+    testSuffix: ["test", "spec"],
+    constantCase: ["upper-snake", "camel"],
+    interfacePrefix: ["", "I"],
+  };
+  if (Object.hasOwn(allowedValues, field)) {
+    const { [field]: allowed } = allowedValues;
+    const listed = allowed.map((option) => (option === "" ? '""' : option)).join("|");
+    return allowed.includes(value as string) ? null : `expected one of ${listed}`;
+  }
+  if (Array.isArray(value) && !value.every((item) => typeof item === "string")) {
+    return "expected string[]";
+  }
+  return null;
+}
+
 function mergeValue(base: unknown, override: unknown, field: string, warnings: string[]): unknown {
   if (override === undefined) {
     return base;
@@ -31,6 +49,11 @@ function mergeValue(base: unknown, override: unknown, field: string, warnings: s
   const expected = describeType(base);
   if (describeType(override) !== expected) {
     warnings.push(`warning config ${field}: expected ${expected}`);
+    return base;
+  }
+  const problem = findValueProblem(field, override);
+  if (problem !== null) {
+    warnings.push(`warning config ${field}: ${problem}`);
     return base;
   }
   if (!isPlainRecord(base) || !isPlainRecord(override)) {

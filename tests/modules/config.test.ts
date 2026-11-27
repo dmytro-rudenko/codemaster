@@ -121,6 +121,58 @@ test("loadConfig keeps rule and source entries from the file", () => {
   }
 });
 
+test("loadConfig rejects a value outside an enum field and keeps the default", () => {
+  const directory = createProject({
+    [CONFIG_FILE_NAME]: JSON.stringify({ layout: "layerd", testSuffix: "jest", interfacePrefix: "X" }),
+  });
+  try {
+    const loaded = loadConfig(directory);
+    assert.equal(loaded.config.layout, "auto");
+    assert.equal(loaded.config.testSuffix, "test");
+    assert.equal(loaded.config.interfacePrefix, "");
+    assert.deepEqual([...loaded.warnings].sort(), [
+      'warning config interfacePrefix: expected one of ""|I',
+      "warning config layout: expected one of auto|modular|layered|off",
+      "warning config testSuffix: expected one of test|spec",
+    ]);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("loadConfig accepts valid enum values without a warning", () => {
+  const directory = createProject({
+    [CONFIG_FILE_NAME]: JSON.stringify({ layout: "layered", testSuffix: "spec", constantCase: "camel", interfacePrefix: "I" }),
+  });
+  try {
+    const loaded = loadConfig(directory);
+    assert.equal(loaded.config.layout, "layered");
+    assert.equal(loaded.config.testSuffix, "spec");
+    assert.equal(loaded.config.constantCase, "camel");
+    assert.equal(loaded.config.interfacePrefix, "I");
+    assert.deepEqual(loaded.warnings, []);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("loadConfig rejects a string-array field holding a non-string and keeps the default", () => {
+  const directory = createProject({
+    [CONFIG_FILE_NAME]: JSON.stringify({ entrypoints: ["bin/*.ts", 5], roles: { module: ["modules", 1] } }),
+  });
+  try {
+    const loaded = loadConfig(directory);
+    assert.deepEqual(loaded.config.entrypoints, CONFIG_DEFAULTS.entrypoints);
+    assert.deepEqual(loaded.config.roles.module, CONFIG_DEFAULTS.roles.module);
+    assert.deepEqual([...loaded.warnings].sort(), [
+      "warning config entrypoints: expected string[]",
+      "warning config roles.module: expected string[]",
+    ]);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("resolveTestsLocation picks colocated for modular and off, tests for layered, explicit value wins", () => {
   const unset = { ...CONFIG_DEFAULTS, testsLocation: "" };
   assert.equal(resolveTestsLocation(unset, "modular"), "colocated");
