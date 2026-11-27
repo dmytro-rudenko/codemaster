@@ -15,10 +15,10 @@ function frontmatter(path: string): string {
 test("plugin manifest", () => {
   const manifest = JSON.parse(read(".claude-plugin/plugin.json"));
   assert.equal(manifest.name, "codemaster");
-  assert.equal(manifest.version, "0.1.0");
+  assert.equal(manifest.version, "0.1.1");
   assert.equal(manifest.hooks, "./hooks/hooks.json");
   const marketplace = JSON.parse(read(".claude-plugin/marketplace.json"));
-  assert.equal(marketplace.plugins[0].version, "0.1.0");
+  assert.equal(marketplace.plugins[0].version, "0.1.1");
 });
 
 test("hooks run the CLI", () => {
@@ -30,7 +30,7 @@ test("hooks run the CLI", () => {
 test("skills carry their names and version", () => {
   const main = frontmatter("skills/codemaster/SKILL.md");
   assert.match(main, /^name: codemaster$/m);
-  assert.match(main, /^version: 0\.1\.0$/m);
+  assert.match(main, /^version: 0\.1\.1$/m);
   const audit = frontmatter("skills/codemaster-audit/SKILL.md");
   assert.match(audit, /^name: codemaster-audit$/m);
   assert.match(audit, /^version: 0\.1\.0$/m);
