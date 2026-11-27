@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts\" hook-stop",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/hook-guard.mjs\" \"${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts\" hook-stop",
             "timeout": 300
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts\" hook-session-start",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/hook-guard.mjs\" \"${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts\" hook-session-start",
             "timeout": 10
           }
         ]

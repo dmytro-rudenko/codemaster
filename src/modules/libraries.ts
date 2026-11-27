@@ -8,6 +8,9 @@ import {
   LIBRARIES_GUARDED_PATHS,
   LIBRARIES_INDEX_FILE,
   LIBRARIES_INDEX_HEADER,
+  LIBRARIES_MANIFEST_FILE,
+  LIBRARIES_MANIFEST_INVALID,
+  LIBRARIES_MANIFEST_MISSING,
   LIBRARIES_NAME_PATTERN,
   LIBRARIES_README_NAMES,
   LIBRARIES_SKILL_DIRECTORY,
@@ -24,7 +27,9 @@ function parseFrontmatter(text: string): Record<string, string> {
   return Object.fromEntries(pairs.flatMap((match) => (match ? [[match[1], match[2].trim()]] : [])));
 }
 
-function readSummaries(projectRoot: string): { fileName: string; name: string; version: string; text: string }[] {
+function readSummaries(
+  projectRoot: string,
+): { fileName: string; name: string; version: string; text: string; managed: boolean }[] {
   const directory = join(projectRoot, LIBRARIES_SKILL_DIRECTORY);
   const fileNames = existsSync(directory) ? readdirSync(directory) : [];
   return fileNames
@@ -32,10 +37,20 @@ function readSummaries(projectRoot: string): { fileName: string; name: string; v
     .sort()
     .map((fileName) => {
       const text = (readTextFile(join(directory, fileName)) ?? "").replaceAll("\r\n", "\n");
-      const { name = fileName.replace(/\.md$/, "").replace(/^(.+?)__(.+)$/, "@$1/$2"), version = "" } =
-        parseFrontmatter(text);
-      return { fileName, name, version, text };
+      const frontmatter = parseFrontmatter(text);
+      const { name = fileName.replace(/\.md$/, "").replace(/^(.+?)__(.+)$/, "@$1/$2"), version = "" } = frontmatter;
+      const managed = "name" in frontmatter && "version" in frontmatter;
+      return { fileName, name, version, text, managed };
     });
+}
+
+function findManifestProblem(projectRoot: string): string | null {
+  const path = join(projectRoot, LIBRARIES_MANIFEST_FILE);
+  const { value, error } = readJsonFile(path);
+  if (error === null && typeof value === "object" && value !== null && !Array.isArray(value)) {
+    return null;
+  }
+  return existsSync(path) ? LIBRARIES_MANIFEST_INVALID : LIBRARIES_MANIFEST_MISSING;
 }
 
 function readDeclared(projectRoot: string, config: ConfigProject): string[] {
@@ -62,8 +77,11 @@ function readInstalled(projectRoot: string, name: string): LibraryEntry | null {
 }
 
 function findOrphans(projectRoot: string, config: ConfigProject): ReturnType<typeof readSummaries> {
+  if (findManifestProblem(projectRoot) !== null) {
+    return [];
+  }
   const declaredFiles = new Set(readDeclared(projectRoot, config).map(fileNameFor));
-  return readSummaries(projectRoot).filter(({ fileName }) => !declaredFiles.has(fileName));
+  return readSummaries(projectRoot).filter(({ fileName, managed }) => managed && !declaredFiles.has(fileName));
 }
 
 export function diffLibraries(input: { projectRoot: string; config: ConfigProject }): LibraryDiff {
@@ -142,6 +160,13 @@ export async function runCommand(context: CommandContext): Promise<number> {
   }
   const prune = argumentsList.includes("--prune");
   const index = argumentsList.includes("--index");
+  const problem = findManifestProblem(projectRoot);
+  if (problem !== null) {
+    process.stderr.write(`warning libraries ${LIBRARIES_MANIFEST_FILE}: ${problem}; nothing pruned\n`);
+    if (prune) {
+      return 1;
+    }
+  }
   try {
     const diff = diffLibraries({ projectRoot, config });
     if (prune) {

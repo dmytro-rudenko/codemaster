@@ -91,9 +91,9 @@ Skills:
 
 ## Requirements
 
-- Node 22.18 or newer. On an older version the CLI prints `codemaster: requires Node >= 22.18` and exits with code 0.
+- Node 22.18 or newer. On an older version the CLI prints `codemaster: requires Node >= 22.18` and exits with code 0. The hooks run through `bin/hook-guard.mjs`, which stays silent and exits with code 0 on Node older than 22.18, and turns a failure to load the CLI into one line on stderr with exit code 0.
 - ast-grep (`@ast-grep/cli` and `@ast-grep/napi`) is installed automatically on the first hook run into `~/.local/share/codemaster` (`$XDG_DATA_HOME/codemaster` when set). Set `CODEMASTER_DATA_DIR` to use another folder. Nothing is installed into your project.
-- A git repository. Outside git the hooks stay silent.
+- A git repository. Outside git the `Stop` hook stays silent; the `SessionStart` hook still prints its context.
 
 ## Limits
 

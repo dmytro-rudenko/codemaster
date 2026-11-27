@@ -542,9 +542,14 @@ test("mixed-case package names are listed and traversal names stay missing", () 
   assert.deepEqual(diff.missing.toSorted(), ["../Outside", "@X/../Y"].toSorted());
 });
 
-test("a summary without frontmatter name maps scope__pkg.md back to @scope/pkg", () => {
+test("a summary without frontmatter is never listed for removal", () => {
   const diff = runDiff({ summaries: { "scope__pkg.md": "## Purpose\nScoped helpers.\n" } });
-  assert.deepEqual(diff.remove, ["@scope/pkg"]);
+  assert.deepEqual(diff.remove, []);
+});
+
+test("a summary with a name but no version is never listed for removal", () => {
+  const diff = runDiff({ summaries: { "notes.md": "---\nname: notes\n---\n\nHand written.\n" } });
+  assert.deepEqual(diff.remove, []);
 });
 
 test("prune deletes the summary of a removed package but not a declared one that shares its frontmatter name", async () => {
@@ -593,4 +598,85 @@ test("a summary with CRLF line endings keeps its frontmatter", () => {
   assert.deepEqual(same.remove, []);
   const newer = runDiff({ dependencies: { beta: "^2.0.0" }, installed: { beta: { version: "2.0.0" } }, summaries });
   assert.deepEqual(newer.stale, [{ name: "beta", previous: "1.2.0", current: "2.0.0" }]);
+});
+
+const conflictManifest = '<<<<<<< HEAD\n{"dependencies":{"lodash":"^4.0.0"}}\n=======\n{"dependencies":{}}\n>>>>>>> main\n';
+
+function createGuardedProject(manifest: string | null): string {
+  const directory = createProject({
+    summaries: {
+      "lodash.md": summaryText("lodash", "4.17.21"),
+      "team-notes.md": "# Team notes\n\nHand written.\n",
+    },
+  });
+  if (manifest === null) {
+    rmSync(join(directory, "package.json"));
+  } else {
+    writeFileSync(join(directory, "package.json"), manifest);
+  }
+  return directory;
+}
+
+test("prune with an unparsable package.json warns, deletes nothing and returns 1", async () => {
+  const directory = createGuardedProject(conflictManifest);
+  try {
+    const result = await runCaptured(createContext(directory, ["--prune"]));
+    assert.equal(result.status, 1);
+    assert.equal(result.stderr, "warning libraries package.json: invalid JSON; nothing pruned\n");
+    assert.equal(existsSync(join(directory, summaryDirectory, "lodash.md")), true);
+    assert.equal(existsSync(join(directory, summaryDirectory, "team-notes.md")), true);
+    assert.equal(existsSync(join(directory, summaryDirectory, "SKILL.md")), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("prune with a missing package.json warns, deletes nothing and returns 1", async () => {
+  const directory = createGuardedProject(null);
+  try {
+    const result = await runCaptured(createContext(directory, ["--prune"]));
+    assert.equal(result.status, 1);
+    assert.equal(result.stderr, "warning libraries package.json: missing; nothing pruned\n");
+    assert.equal(existsSync(join(directory, summaryDirectory, "lodash.md")), true);
+    assert.equal(existsSync(join(directory, summaryDirectory, "team-notes.md")), true);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("libraries without --prune warns about an unparsable package.json, lists no removals and returns 0", async () => {
+  const directory = createGuardedProject(conflictManifest);
+  try {
+    const result = await runCaptured(createContext(directory, []));
+    assert.equal(result.status, 0);
+    assert.equal(result.stderr, "warning libraries package.json: invalid JSON; nothing pruned\n");
+    assert.doesNotMatch(result.stdout, /remove/);
+    assert.equal(existsSync(join(directory, summaryDirectory, "lodash.md")), true);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("prune keeps a hand-written file and deletes an undeclared summary with frontmatter", async () => {
+  const directory = createProject({
+    dependencies: { alpha: "^1.0.0" },
+    installed: { alpha: { version: "1.0.0" } },
+    summaries: {
+      "alpha.md": summaryText("alpha", "1.0.0"),
+      "team-notes.md": "# Team notes\n\nHand written.\n",
+      "zeta.md": summaryText("zeta", "3.0.0"),
+    },
+  });
+  try {
+    const result = await runCaptured(createContext(directory, ["--prune"]));
+    assert.equal(result.status, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(existsSync(join(directory, summaryDirectory, "team-notes.md")), true);
+    assert.equal(existsSync(join(directory, summaryDirectory, "zeta.md")), false);
+    assert.equal(existsSync(join(directory, summaryDirectory, "alpha.md")), true);
+    assert.ok(result.stdout.split("\n").includes("remove zeta"), result.stdout);
+    assert.doesNotMatch(result.stdout, /team-notes/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

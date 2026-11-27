@@ -5,6 +5,10 @@ export const CONFIG_FILE_NAME = ".codemaster.json";
 
 export const CONFIG_LOCAL_FILE_NAME = ".codemaster.local.json";
 
+export const CONFIG_SOURCE_ROOT_PATTERN = /^[A-Za-z0-9_@.\/-]{1,100}$/;
+
+export const CONFIG_RULE_PROBLEM = 'expected "off", a severity or {severity, max, reason}';
+
 export const CONFIG_DEFAULTS: ConfigProject = {
   hook: true,
   layout: "auto",

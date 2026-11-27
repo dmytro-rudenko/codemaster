@@ -8,7 +8,7 @@ import {
   TOURNAMENT_TIE_ORDER,
   TOURNAMENT_TIMEOUT_MILLISECONDS,
 } from "../consts/tournament.ts";
-import { isRepository, listChangedFiles, listChangedLineRanges, resolveStateDirectory } from "../helpers/infrastructure/git.ts";
+import { findMergeBase, isRepository, listChangedFiles, resolveStateDirectory } from "../helpers/infrastructure/git.ts";
 import { parseSource } from "../helpers/infrastructure/ast-grep.ts";
 import { runProcess } from "../helpers/infrastructure/process.ts";
 import { detectLayout, resolveFileRole } from "../helpers/logic/file-role.ts";
@@ -23,6 +23,7 @@ import { hashText } from "../utils/hash.ts";
 import { ensureInstalled } from "./install.ts";
 import type { CommandContext } from "../interfaces/command.ts";
 import type { ConfigProject, ConfigWeights } from "../interfaces/config.ts";
+import type { RoleLayout } from "../interfaces/role.ts";
 import type {
   TournamentCandidate,
   TournamentDoneEntry,
@@ -114,12 +115,11 @@ function appendDoneEntry(projectRoot: string, entry: TournamentDoneEntry): void 
   writeFileSync(path, `${JSON.stringify([...entries, entry], null, 2)}\n`);
 }
 
-function isCandidateFile(file: string, options: { projectRoot: string; config: ConfigProject }): boolean {
-  const { projectRoot, config } = options;
+function isCandidateFile(file: string, options: { layout: RoleLayout; config: ConfigProject }): boolean {
   if (![".ts", ".mts", ".cts", ".js", ".mjs", ".cjs"].includes(extname(file)) || file.endsWith(".d.ts")) {
     return false;
   }
-  const { role } = resolveFileRole(file, { layout: detectLayout(projectRoot, config), config });
+  const { role } = resolveFileRole(file, options);
   if (role === "test") {
     return false;
   }
@@ -130,15 +130,40 @@ function overlapsChange(ranges: Array<{ start: number; end: number }> | "new", l
   return ranges === "new" || ranges.some(({ start, end }) => start <= endLine && end >= line);
 }
 
-export async function findCandidates(input: { projectRoot: string; config: ConfigProject }): Promise<TournamentCandidate[]> {
+function runGit(projectRoot: string, gitArguments: string[]): string | null {
+  const { status, stdout } = runProcess("git", gitArguments, { cwd: projectRoot });
+  return status === 0 ? stdout : null;
+}
+
+function findDiffBase(projectRoot: string): string | null {
+  return findMergeBase(projectRoot) ?? (runGit(projectRoot, ["rev-parse", "--verify", "--quiet", "HEAD"]) === null ? null : "HEAD");
+}
+
+function parseHunks(diff: string): Array<{ start: number; end: number }> {
+  return [...diff.matchAll(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/gm)]
+    .map((match) => ({ start: Number(match[1]), count: match[2] === undefined ? 1 : Number(match[2]) }))
+    .filter(({ count }) => count > 0)
+    .map(({ start, count }) => ({ start, end: start + count - 1 }));
+}
+
+function createRangeLookup(projectRoot: string, files: string[]): (file: string) => Array<{ start: number; end: number }> | "new" {
+  const base = files.length === 0 ? null : findDiffBase(projectRoot);
+  const tracked = new Set(base === null ? [] : (runGit(projectRoot, ["ls-files", "-z", "--cached", "--", ...files]) ?? "").split("\0"));
+  return (file) => (tracked.has(file) ? parseHunks(runGit(projectRoot, ["diff", "-U0", base as string, "--", file]) ?? "") : "new");
+}
+
+export async function findCandidates(input: { projectRoot: string; config: ConfigProject; files?: string[] }): Promise<TournamentCandidate[]> {
   const { projectRoot, config } = input;
   const { minComplexity, minLines } = config.tournament;
   const doneEntries = readDoneEntries(projectRoot);
   const isDone = (key: string, bodyHash: string): boolean =>
     doneEntries.some((entry) => entry.key === key && (entry.skipped || entry.bodyHash === bodyHash));
+  const layout = detectLayout(projectRoot, config);
+  const files = (input.files ?? listChangedFiles(projectRoot)).filter((path) => isCandidateFile(path, { layout, config }));
+  const lookupRanges = createRangeLookup(projectRoot, files);
   const candidates: TournamentCandidate[] = [];
-  for (const file of listChangedFiles(projectRoot).filter((path) => isCandidateFile(path, input))) {
-    const ranges = listChangedLineRanges(projectRoot, file);
+  for (const file of files) {
+    const ranges = lookupRanges(file);
     const root = (await parseSource(file, readFileSync(join(projectRoot, file), "utf8"))).root();
     for (const { node, name, line, endLine, usesThis, bodyText } of listFunctions(root)) {
       if (name === null || usesThis || !overlapsChange(ranges, line, endLine)) {

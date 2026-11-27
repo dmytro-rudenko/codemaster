@@ -506,3 +506,47 @@ test("scanConventions with the linter off never runs the project's eslint", asyn
     rmSync(projectRoot, { recursive: true, force: true });
   }
 });
+
+function writeMarkerEslint(projectRoot: string): string {
+  const marker = join(projectRoot, "eslint-ran");
+  mkdirSync(join(projectRoot, "node_modules/.bin"), { recursive: true });
+  writeFileSync(join(projectRoot, "node_modules/.bin/eslint"), `#!/bin/sh\ntouch ${marker}\necho '{"rules":{}}'\n`);
+  chmodSync(join(projectRoot, "node_modules/.bin/eslint"), 0o755);
+  return marker;
+}
+
+async function runQuietly(projectRoot: string, argumentsList: string[]): Promise<number> {
+  const originalStderr = process.stderr.write;
+  const originalStdout = process.stdout.write;
+  process.stderr.write = (() => true) as typeof process.stderr.write;
+  process.stdout.write = (() => true) as typeof process.stdout.write;
+  try {
+    return await runCommand({
+      argumentsList,
+      projectRoot,
+      config: structuredClone(CONFIG_DEFAULTS),
+      configWarnings: [],
+      input: "",
+      pluginRoot: process.cwd(),
+    });
+  } finally {
+    process.stderr.write = originalStderr;
+    process.stdout.write = originalStdout;
+  }
+}
+
+test("bare conventions on a project without a config never runs the project's eslint", async () => {
+  await withProject({ "src/modules/user.ts": "export function loadUser() { return 1; }\n" }, async (directory) => {
+    const marker = writeMarkerEslint(directory);
+    assert.equal(await runQuietly(directory, []), 0);
+    assert.equal(existsSync(marker), false);
+  });
+});
+
+test("conventions --refresh runs the project's eslint", async () => {
+  await withProject({ "src/modules/user.ts": "export function loadUser() { return 1; }\n" }, async (directory) => {
+    const marker = writeMarkerEslint(directory);
+    assert.equal(await runQuietly(directory, ["--refresh"]), 0);
+    assert.equal(existsSync(marker), true);
+  });
+});

@@ -1,7 +1,13 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { CHECK_RULE_SEVERITY } from "../consts/check.ts";
-import { CONFIG_DEFAULTS, CONFIG_FILE_NAME, CONFIG_LOCAL_FILE_NAME } from "../consts/config.ts";
+import {
+  CONFIG_DEFAULTS,
+  CONFIG_FILE_NAME,
+  CONFIG_LOCAL_FILE_NAME,
+  CONFIG_RULE_PROBLEM,
+  CONFIG_SOURCE_ROOT_PATTERN,
+} from "../consts/config.ts";
 import type { ConfigProject, ConfigSeverity } from "../interfaces/config.ts";
 import type { RoleLayout } from "../interfaces/role.ts";
 import { readJsonFile } from "../helpers/infrastructure/filesystem.ts";
@@ -17,7 +23,43 @@ function describeType(value: unknown): string {
   return Array.isArray(value) ? "array" : typeof value;
 }
 
+function isRelativePath(value: unknown): boolean {
+  return (
+    typeof value === "string" &&
+    CONFIG_SOURCE_ROOT_PATTERN.test(value) &&
+    !value.startsWith("/") &&
+    !value.split("/").includes("..")
+  );
+}
+
+function isRuleSetting(setting: unknown): boolean {
+  if (setting === "off" || setting === "error" || setting === "warning") {
+    return true;
+  }
+  if (!isPlainRecord(setting)) {
+    return false;
+  }
+  const { severity, max, reason } = setting;
+  const validSeverity = severity === undefined || severity === "error" || severity === "warning";
+  const validMax = max === undefined || (typeof max === "number" && Number.isInteger(max) && max >= 0);
+  return validSeverity && validMax && (reason === undefined || typeof reason === "string");
+}
+
+function keepValidRules(rules: Record<string, unknown>, warnings: string[]): Record<string, unknown> {
+  const valid = Object.entries(rules).filter(([ruleId, setting]) => {
+    const accepted = isRuleSetting(setting);
+    if (!accepted) {
+      warnings.push(`warning config rules.${ruleId}: ${CONFIG_RULE_PROBLEM}`);
+    }
+    return accepted;
+  });
+  return Object.fromEntries(valid);
+}
+
 function findValueProblem(field: string, value: unknown): string | null {
+  if (field === "sourceRoot") {
+    return isRelativePath(value) ? null : "expected a relative path";
+  }
   const allowedValues: Record<string, string[]> = {
     layout: ["auto", "modular", "layered", "off"],
     testSuffix: ["test", "spec"],
@@ -59,7 +101,10 @@ function mergeValue(base: unknown, override: unknown, field: string, warnings: s
   if (!isPlainRecord(base) || !isPlainRecord(override)) {
     return override;
   }
-  if (field === "rules" || field === "sources") {
+  if (field === "rules") {
+    return { ...base, ...keepValidRules(override, warnings) };
+  }
+  if (field === "sources") {
     return { ...base, ...override };
   }
   const merged: Record<string, unknown> = {};
@@ -105,23 +150,25 @@ export function resolveTestsLocation(config: ConfigProject, layout: RoleLayout):
 export function resolveRuleSetting(
   config: ConfigProject,
   ruleId: string,
-): { enabled: boolean; severity: ConfigSeverity; max: number | null; reason: string | null } {
+): { enabled: boolean; severity: ConfigSeverity; explicit: boolean; max: number | null; reason: string | null } {
   const { rules } = config;
   const setting: unknown = rules[ruleId];
   const severity = CHECK_RULE_SEVERITY[ruleId] ?? "error";
   if (setting === "off") {
-    return { enabled: false, severity, max: null, reason: null };
+    return { enabled: false, severity, explicit: false, max: null, reason: null };
   }
   if (setting === "error" || setting === "warning") {
-    return { enabled: true, severity: setting, max: null, reason: null };
+    return { enabled: true, severity: setting, explicit: true, max: null, reason: null };
   }
   if (!isPlainRecord(setting)) {
-    return { enabled: true, severity, max: null, reason: null };
+    return { enabled: true, severity, explicit: false, max: null, reason: null };
   }
   const { severity: chosen, max, reason } = setting;
+  const explicit = chosen === "error" || chosen === "warning";
   return {
     enabled: true,
-    severity: chosen === "error" || chosen === "warning" ? chosen : severity,
+    severity: explicit ? chosen : severity,
+    explicit,
     max: typeof max === "number" ? max : null,
     reason: typeof reason === "string" ? reason : null,
   };

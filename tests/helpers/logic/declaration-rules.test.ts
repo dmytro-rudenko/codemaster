@@ -417,6 +417,22 @@ test("max-params stays silent on five parameters", async () => {
   expectNone(await checkSource(text, role), "max-params");
 });
 
+test("a max-params setting of null falls back to the default limit instead of throwing", async () => {
+  const role = roleFor("module", "src/user/user.service.ts", "user");
+  const text =
+    "export function createUser(first: string, second: string, third: string, fourth: string, fifth: string, sixth: string) { return first; }\n";
+  const config = { ...MODULAR_CONFIG, rules: { "max-params": null } } as unknown as ConfigProject;
+  expectOne(await checkSource(text, role, config), "max-params", role.path);
+});
+
+test("a max-params object setting raises the limit", async () => {
+  const role = roleFor("module", "src/user/user.service.ts", "user");
+  const text =
+    "export function createUser(first: string, second: string, third: string, fourth: string, fifth: string, sixth: string) { return first; }\n";
+  const config = { ...MODULAR_CONFIG, rules: { "max-params": { max: 6 } } };
+  expectNone(await checkSource(text, role, config), "max-params");
+});
+
 const DEEP_BLOCKS_SOURCE = [
   "export function walkOrders(orders: number[]) {",
   "  let total = 0;",

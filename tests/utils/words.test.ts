@@ -17,3 +17,9 @@ test("toEntityCase renders an entity in each style", () => {
   assert.equal(toEntityCase("order_item", "pascal"), "OrderItem");
   assert.equal(toEntityCase("user", "pascal"), "User");
 });
+
+test("splitWords stays linear on a long run of capitals", () => {
+  const started = performance.now();
+  assert.deepEqual(splitWords("A".repeat(200000)), ["a".repeat(200000)]);
+  assert.ok(performance.now() - started < 1000);
+});

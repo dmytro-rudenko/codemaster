@@ -3,6 +3,7 @@ import type { ConfigProject } from "../../interfaces/config.ts";
 import type { FindingItem } from "../../interfaces/finding.ts";
 import type { RoleFile } from "../../interfaces/role.ts";
 import { CHECK_LIMITS, CHECK_RULE_SEVERITY } from "../../consts/check.ts";
+import { resolveRuleSetting } from "../../modules/config.ts";
 import { checkEntityPrefix, countNameWords, findAbbreviation } from "./naming.ts";
 import {
   findThenInThen,
@@ -148,8 +149,7 @@ function makeFinding(ruleId: string, path: string, line: number, message: string
 }
 
 function ruleLimit(config: ConfigProject, ruleId: string, fallback: number): number {
-  const setting = config.rules[ruleId];
-  return typeof setting === "object" && typeof setting.max === "number" ? setting.max : fallback;
+  return resolveRuleSetting(config, ruleId).max ?? fallback;
 }
 
 function countContentLines(text: string): number {

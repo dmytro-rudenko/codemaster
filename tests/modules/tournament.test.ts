@@ -534,3 +534,37 @@ test("runTournament refuses a functionName that is not an identifier", async () 
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("findCandidates looks only at the files it is given", async () => {
+  const directory = copyFixture("candidates");
+  initRepository(directory, { commitFiles: false });
+  try {
+    assert.deepEqual(await findCandidates({ projectRoot: directory, config: CONFIG_DEFAULTS, files: [] }), []);
+    const listed = await findCandidates({ projectRoot: directory, config: CONFIG_DEFAULTS, files: ["src/math.ts"] });
+    assert.deepEqual(listed.map(({ file, functionName }) => `${file}#${functionName}`), ["src/math.ts#scoreValues"]);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("findCandidates on given files keeps only functions whose lines changed since the base", async () => {
+  const directory = copyFixture("candidates");
+  initRepository(directory);
+  try {
+    const source = readFileSync(join(directory, "src/math.ts"), "utf8");
+    const renamed = source.replace("scoreValues", "rankValues").replace("score += 1", "score += 3");
+    writeFileSync(join(directory, "src/math.ts"), `${source}\n${renamed}`);
+    writeFileSync(join(directory, "src/fresh.ts"), renamed.replace("rankValues", "freshValues"));
+    const listed = await findCandidates({
+      projectRoot: directory,
+      config: CONFIG_DEFAULTS,
+      files: ["src/fresh.ts", "src/math.ts"],
+    });
+    assert.deepEqual(listed.map(({ file, functionName }) => `${file}#${functionName}`), [
+      "src/fresh.ts#freshValues",
+      "src/math.ts#rankValues",
+    ]);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

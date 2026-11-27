@@ -107,6 +107,16 @@ test("a failed install never breaks the session", () => {
   assert.match(result.stderr, /^codemaster:/m);
 });
 
+test("a later stop reports only the file changed since the last check", () => {
+  const directory = preparedRepository();
+  appendFileSync(join(directory, "src/user/user.service.ts"), sixParameters);
+  assert.match(JSON.parse(stop(directory).stdout).reason, /src\/user\/user\.service\.ts/);
+  appendFileSync(join(directory, "src/order/order.service.ts"), sixParameters);
+  const { reason } = JSON.parse(stop(directory).stdout);
+  assert.match(reason, /max-params src\/order\/order\.service\.ts/);
+  assert.doesNotMatch(reason, /user\.service\.ts/);
+});
+
 test("session start names the layout", () => {
   const directory = preparedRepository();
   const result = runCli(["hook-session-start"], { cwd: directory, input: JSON.stringify({ cwd: directory }) });

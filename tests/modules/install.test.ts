@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { INSTALL_AST_GREP_VERSION } from "../../src/consts/install.ts";
+import { INSTALL_AST_GREP_VERSION, INSTALL_PACKAGES } from "../../src/consts/install.ts";
 import {
   ensureInstalled,
   isInstalled,
@@ -285,3 +285,58 @@ test(
     });
   },
 );
+
+const FAKE_NPM_COUNTS_RUNS = 'echo run >> "$3/../npm-runs"';
+
+function countNpmRuns(dataDirectory: string): number {
+  const path = join(dataDirectory, "../npm-runs");
+  return existsSync(path) ? readFileSync(path, "utf8").trim().split("\n").length : 0;
+}
+
+test("a failed install backs off for an hour without running npm again", async () => {
+  await withFakeNpm(`${FAKE_NPM_COUNTS_RUNS}\nexit 1`, (dataDirectory) => {
+    const before = Date.now();
+    assert.equal(ensureInstalled().ok, false);
+    const failedAt = Date.parse(readFileSync(join(dataDirectory, "install-failed"), "utf8"));
+    assert.ok(failedAt >= before - 1000 && failedAt <= Date.now(), `${failedAt}`);
+    assert.deepEqual(ensureInstalled(), {
+      ok: false,
+      message: `codemaster: install failed recently; retrying after ${new Date(failedAt + 3600000).toISOString()}; run codemaster install to retry now`,
+    });
+    assert.equal(countNpmRuns(dataDirectory), 1);
+  });
+});
+
+test("an install failure older than an hour runs npm again", async () => {
+  await withFakeNpm(`${FAKE_NPM_COUNTS_RUNS}\nexit 1`, (dataDirectory) => {
+    mkdirSync(dataDirectory, { recursive: true });
+    writeFileSync(join(dataDirectory, "install-failed"), new Date(Date.now() - 3600001).toISOString());
+    assert.equal(ensureInstalled().message, "codemaster: install failed (exit 1)");
+    assert.equal(countNpmRuns(dataDirectory), 1);
+  });
+});
+
+test("a successful install removes the failure marker", async () => {
+  await withFakeNpm(FAKE_NPM_WRITES_PACKAGES, (dataDirectory) => {
+    mkdirSync(dataDirectory, { recursive: true });
+    writeFileSync(join(dataDirectory, "install-failed"), new Date(Date.now() - 3600001).toISOString());
+    assert.equal(ensureInstalled().ok, true);
+    assert.equal(existsSync(join(dataDirectory, "install-failed")), false);
+  });
+});
+
+test("the install command retries at once despite a recent failure", async () => {
+  await withFakeNpm(`${FAKE_NPM_COUNTS_RUNS}\nexit 1`, async (dataDirectory) => {
+    mkdirSync(dataDirectory, { recursive: true });
+    writeFileSync(join(dataDirectory, "install-failed"), new Date().toISOString());
+    const written = await captureStderr(async () => {
+      await runCommand();
+    });
+    assert.deepEqual(written, ["codemaster: install failed (exit 1)\n"]);
+    assert.equal(countNpmRuns(dataDirectory), 1);
+  });
+});
+
+test("the install packages carry the pinned ast-grep version", () => {
+  assert.deepEqual(INSTALL_PACKAGES, [`@ast-grep/cli@${INSTALL_AST_GREP_VERSION}`, `@ast-grep/napi@${INSTALL_AST_GREP_VERSION}`]);
+});

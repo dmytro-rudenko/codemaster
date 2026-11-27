@@ -4,9 +4,13 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   INSTALL_AST_GREP_VERSION,
+  INSTALL_FAILED_FILE,
+  INSTALL_PACKAGE_NAMES,
   INSTALL_PACKAGES,
+  INSTALL_RETRY_MILLISECONDS,
   INSTALL_TIMEOUT_MILLISECONDS,
 } from "../consts/install.ts";
+import { readTextFile, removeFile, writeTextFile } from "../helpers/infrastructure/filesystem.ts";
 
 export function resolveDataDirectory(): string {
   const explicit = process.env.CODEMASTER_DATA_DIR;
@@ -30,16 +34,12 @@ function readInstalledVersion(packageName: string): string | null {
 }
 
 export function isInstalled(): boolean {
-  return ["@ast-grep/napi", "@ast-grep/cli"].every(
+  return INSTALL_PACKAGE_NAMES.every(
     (packageName) => readInstalledVersion(packageName) === INSTALL_AST_GREP_VERSION,
   );
 }
 
-export function ensureInstalled(): { ok: boolean; message: string | null } {
-  const dataDirectory = resolveDataDirectory();
-  if (isInstalled()) {
-    return { ok: true, message: null };
-  }
+function runInstall(dataDirectory: string): { ok: boolean; message: string | null } {
   try {
     mkdirSync(dataDirectory, { recursive: true });
   } catch (error) {
@@ -64,7 +64,41 @@ export function ensureInstalled(): { ok: boolean; message: string | null } {
   return { ok: false, message: `codemaster: install failed (${reason.trim()})` };
 }
 
+function findRetryTime(markerPath: string): number | null {
+  const failedAt = Date.parse(readTextFile(markerPath) ?? "");
+  const retryAt = failedAt + INSTALL_RETRY_MILLISECONDS;
+  return Number.isNaN(failedAt) || retryAt <= Date.now() ? null : retryAt;
+}
+
+function recordOutcome(markerPath: string, succeeded: boolean): void {
+  try {
+    if (succeeded) {
+      removeFile(markerPath);
+    } else {
+      writeTextFile(markerPath, new Date().toISOString());
+    }
+  } catch {
+    return;
+  }
+}
+
+export function ensureInstalled(): { ok: boolean; message: string | null } {
+  if (isInstalled()) {
+    return { ok: true, message: null };
+  }
+  const dataDirectory = resolveDataDirectory();
+  const markerPath = join(dataDirectory, INSTALL_FAILED_FILE);
+  const retryAt = findRetryTime(markerPath);
+  if (retryAt !== null) {
+    return { ok: false, message: `codemaster: install failed recently; retrying after ${new Date(retryAt).toISOString()}; run codemaster install to retry now` };
+  }
+  const outcome = runInstall(dataDirectory);
+  recordOutcome(markerPath, outcome.ok);
+  return outcome;
+}
+
 export async function runCommand(): Promise<number> {
+  recordOutcome(join(resolveDataDirectory(), INSTALL_FAILED_FILE), true);
   const outcome = ensureInstalled();
   if (outcome.message) {
     process.stderr.write(`${outcome.message}\n`);

@@ -94,6 +94,16 @@ test("a rule setting replaces the severity and attaches the reason", async () =>
   assert.equal(summary.errors, 0);
 });
 
+test("a null rule setting keeps the rule's own severity instead of crashing", async () => {
+  const { findings, summary } = await checkProject(
+    { "src/pages/home.ts": sixParameters },
+    { rules: { "max-params": null } as unknown as ConfigProject["rules"] },
+  );
+  assert.deepEqual(triplesOf(findings), ["max-params src/pages/home.ts:1"]);
+  assert.equal(findings[0].severity, "error");
+  assert.equal(summary.errors, 1);
+});
+
 test("an unparsable file gives one parse warning and the other files are still checked", async () => {
   const { findings } = await checkProject({
     "src/pages/broken.ts": "export function broken( {\n  const = ;\n  if (\n",
@@ -104,6 +114,25 @@ test("an unparsable file gives one parse warning and the other files are still c
     { severity: "warning", ruleId: "parse", file: "src/pages/broken.ts", line: 1, message: "could not parse" },
   ]);
   assert.ok(triplesOf(findings).includes("max-params src/pages/home.ts:1"), triplesOf(findings).join("\n"));
+});
+
+test("a file that cannot be read gives a warning and the other files are still checked", async () => {
+  const projectRoot = createProject({ "src/pages/home.ts": sixParameters, "src/pages/folder.js/inner.ts": "export const a = 1;\n" });
+  const files = ["src/pages/folder.js", "src/pages/gone.ts", "src/pages/home.ts"];
+  const { findings, summary } = await runChecks({ projectRoot, pluginRoot, config: settingsWith(), files });
+  const failures = findings.filter((finding) => finding.ruleId === "parse");
+  assert.deepEqual(
+    failures.map(({ severity, file, line }) => ({ severity, file, line })),
+    [
+      { severity: "warning", file: "src/pages/folder.js", line: 1 },
+      { severity: "warning", file: "src/pages/gone.ts", line: 1 },
+    ],
+  );
+  assert.match(failures[0].message, /^could not check: EISDIR/);
+  assert.match(failures[1].message, /^could not check: ENOENT/);
+  assert.ok(!failures[0].message.includes("\n"));
+  assert.ok(triplesOf(findings).includes("max-params src/pages/home.ts:1"), triplesOf(findings).join("\n"));
+  assert.equal(summary.errors, 1);
 });
 
 test("the exit code ignores a parse warning", async () => {

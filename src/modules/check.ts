@@ -22,7 +22,7 @@ async function parseRoot(file: string, text: string) {
   }
 }
 
-async function checkFile(input: { projectRoot: string; file: string; layout: RoleLayout; config: ConfigProject }) {
+async function analyzeFile(input: { projectRoot: string; file: string; layout: RoleLayout; config: ConfigProject }) {
   const { projectRoot, file, layout, config } = input;
   const role = resolveFileRole(file, { layout, config });
   const text = readFileSync(join(projectRoot, file), "utf8");
@@ -36,14 +36,29 @@ async function checkFile(input: { projectRoot: string; file: string; layout: Rol
   return { findings: [...declarations, ...mirror], parsed: true, test: role.role === "test" };
 }
 
+async function checkFile(input: { projectRoot: string; file: string; layout: RoleLayout; config: ConfigProject }) {
+  try {
+    return await analyzeFile(input);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    const [firstLine] = reason.split("\n");
+    const failure: FindingItem = {
+      severity: "warning",
+      ruleId: "parse",
+      file: input.file,
+      line: 1,
+      message: `could not check: ${firstLine}`,
+    };
+    return { findings: [failure], parsed: false, test: false };
+  }
+}
+
 function applySettings(findings: FindingItem[], config: ConfigProject): FindingItem[] {
   return findings.flatMap((finding) => {
-    const { enabled, severity, reason } = resolveRuleSetting(config, finding.ruleId);
+    const { enabled, severity, explicit, reason } = resolveRuleSetting(config, finding.ruleId);
     if (!enabled) {
       return [];
     }
-    const setting = config.rules[finding.ruleId];
-    const explicit = typeof setting === "string" || (typeof setting === "object" && setting.severity !== undefined);
     const adjusted = { ...finding, severity: explicit ? severity : finding.severity };
     return [reason === null ? adjusted : { ...adjusted, reason }];
   });

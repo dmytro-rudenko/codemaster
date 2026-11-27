@@ -261,7 +261,11 @@ export async function runCommand(context: CommandContext): Promise<number> {
     process.stdout.write(describeProfile(projectRoot, config, raw));
     return 0;
   }
-  const { profile, sources, warnings } = await scanConventions(projectRoot, { config, raw });
+  const { profile, sources, warnings } = await scanConventions(projectRoot, {
+    config,
+    raw,
+    linter: argumentsList.includes("--refresh"),
+  });
   const rules = { ...asRecord(raw.rules), ...asRecord(profile.rules) };
   const merged = { ...raw, ...profile, ...(Object.keys(rules).length > 0 ? { rules } : {}), sources: { ...asRecord(raw.sources), ...sources } };
   writeProfile(projectRoot, merged);

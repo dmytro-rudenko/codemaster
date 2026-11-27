@@ -1,6 +1,6 @@
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { ensureInstalled } from "../../../src/modules/install.ts";
@@ -156,4 +156,127 @@ test("scanWithRules removes its rule copies from the temporary directory", () =>
     }
     rmSync(sandboxRoot, { recursive: true, force: true });
   }
+});
+
+function withFakeBinary<Result>(script: string, run: () => Result): Result {
+  const dataDirectory = mkdtempSync(join(tmpdir(), "codemaster-fake-"));
+  const binary = join(dataDirectory, "node_modules", ".bin", "ast-grep");
+  mkdirSync(dirname(binary), { recursive: true });
+  writeFileSync(binary, `#!/bin/sh\n${script}\n`, { mode: 0o755 });
+  const original = process.env.CODEMASTER_DATA_DIR;
+  process.env.CODEMASTER_DATA_DIR = dataDirectory;
+  try {
+    return run();
+  } finally {
+    if (original === undefined) {
+      delete process.env.CODEMASTER_DATA_DIR;
+    } else {
+      process.env.CODEMASTER_DATA_DIR = original;
+    }
+    rmSync(dataDirectory, { recursive: true, force: true });
+  }
+}
+
+function numberedFiles(count: number): string[] {
+  return Array.from({ length: count }, (_, position) => `src/file${position}.ts`);
+}
+
+const FAILURE_BASE = { severity: "warning", ruleId: "ast-grep", file: "(ast-grep)", line: 1 };
+
+test("scanWithRules reports a rule the CLI cannot parse instead of reading as clean", () => {
+  const pluginRoot = mkdtempSync(join(tmpdir(), "codemaster-plugin-"));
+  const projectRoot = mkdtempSync(join(tmpdir(), "codemaster-scan-"));
+  try {
+    mkdirSync(join(pluginRoot, "rules", "typescript"), { recursive: true });
+    writeFileSync(join(pluginRoot, "rules", "typescript", "broken.yml"), "id: broken\nlanguage: TypeScript\nrule: [unclosed\n");
+    writeFileSync(join(projectRoot, "a.ts"), "const name = user.name;\n");
+    const findings = scanWithRules({ pluginRoot, projectRoot, files: ["a.ts"] });
+    assert.equal(findings.length, 1, JSON.stringify(findings));
+    assert.deepEqual({ ...findings[0], message: "" }, { ...FAILURE_BASE, message: "" });
+    assert.match(findings[0].message, /^ast-grep failed: Error: Cannot parse rule /);
+    assert.ok(!findings[0].message.includes("\n"));
+  } finally {
+    rmSync(pluginRoot, { recursive: true, force: true });
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("scanWithRules reports a non-zero exit with the first stderr line, once for every batch", () => {
+  const findings = withFakeBinary('echo "boom" >&2\necho "second line" >&2\nexit 3', () =>
+    scanWithRules({ pluginRoot: PLUGIN_ROOT, projectRoot: tmpdir(), files: numberedFiles(1001) }),
+  );
+  assert.deepEqual(findings, [{ ...FAILURE_BASE, message: "ast-grep failed: boom" }]);
+});
+
+test("scanWithRules reports a non-zero exit without stderr by its status", () => {
+  const findings = withFakeBinary("exit 5", () =>
+    scanWithRules({ pluginRoot: PLUGIN_ROOT, projectRoot: tmpdir(), files: ["a.ts"] }),
+  );
+  assert.deepEqual(findings, [{ ...FAILURE_BASE, message: "ast-grep failed: exit 5" }]);
+});
+
+test("scanWithRules reports a binary that cannot be started", () => {
+  const findings = withFakeBinary("exit 0", () => {
+    rmSync(join(process.env.CODEMASTER_DATA_DIR ?? "", "node_modules"), { recursive: true, force: true });
+    return scanWithRules({ pluginRoot: PLUGIN_ROOT, projectRoot: tmpdir(), files: ["a.ts"] });
+  });
+  assert.equal(findings.length, 1, JSON.stringify(findings));
+  assert.deepEqual({ ...findings[0], message: "" }, { ...FAILURE_BASE, message: "" });
+  assert.match(findings[0].message, /^ast-grep failed: \S/);
+});
+
+test("scanWithRules skips output lines that are not findings and keeps the valid ones", () => {
+  const valid =
+    '{"severity":"warning","ruleId":"prefer-destructuring","file":"a.ts","range":{"start":{"line":6}},"message":"use destructuring"}';
+  const script = `printf '%s\\n' 'not json' '{}' '{"half":' '${valid}'`;
+  const findings = withFakeBinary(script, () =>
+    scanWithRules({ pluginRoot: PLUGIN_ROOT, projectRoot: tmpdir(), files: ["a.ts"] }),
+  );
+  assert.deepEqual(findings, [
+    { severity: "warning", ruleId: "prefer-destructuring", file: "a.ts", line: 7, message: "use destructuring" },
+  ]);
+});
+
+test("scanWithRules keeps error-level findings that make the CLI exit with status 1", () => {
+  const loud =
+    '{"severity":"error","ruleId":"loud","file":"a.ts","range":{"start":{"line":0}},"message":"loud"}';
+  const findings = withFakeBinary(`printf '%s\\n' '${loud}'\nexit 1`, () =>
+    scanWithRules({ pluginRoot: PLUGIN_ROOT, projectRoot: tmpdir(), files: ["a.ts"] }),
+  );
+  assert.deepEqual(findings, [{ severity: "error", ruleId: "loud", file: "a.ts", line: 1, message: "loud" }]);
+});
+
+test("scanWithRules keeps two matches of one rule on the same line", () => {
+  const same =
+    '{"severity":"warning","ruleId":"prefer-destructuring","file":"a.ts","range":{"start":{"line":0}},"message":"use destructuring"}';
+  const findings = withFakeBinary(`printf '%s\\n' '${same}' '${same}'`, () =>
+    scanWithRules({ pluginRoot: PLUGIN_ROOT, projectRoot: tmpdir(), files: ["a.ts"] }),
+  );
+  assert.equal(findings.length, 2);
+});
+
+test("scanWithRules passes the files to ast-grep in batches of 500", () => {
+  const logDirectory = mkdtempSync(join(tmpdir(), "codemaster-log-"));
+  const logPath = join(logDirectory, "arguments.log");
+  try {
+    withFakeBinary(`echo "$#" >> "${logPath}"`, () =>
+      scanWithRules({ pluginRoot: PLUGIN_ROOT, projectRoot: tmpdir(), files: numberedFiles(1201) }),
+    );
+    const prefixArguments = 5;
+    const counts = readFileSync(logPath, "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => Number(line) - prefixArguments);
+    assert.deepEqual(counts, [500, 500, 201]);
+  } finally {
+    rmSync(logDirectory, { recursive: true, force: true });
+  }
+});
+
+test("scanWithRules groups a large file list by language in linear time", () => {
+  const files = Array.from({ length: 40000 }, (_, position) => `src/file${position}.${position % 2 === 0 ? "ts" : "js"}`);
+  const started = performance.now();
+  withFakeBinary("exit 0", () => scanWithRules({ pluginRoot: PLUGIN_ROOT, projectRoot: tmpdir(), files }));
+  const elapsed = Math.round(performance.now() - started);
+  assert.ok(elapsed < 2000, `took ${elapsed} ms`);
 });
