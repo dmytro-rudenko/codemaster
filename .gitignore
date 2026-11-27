@@ -1,0 +1,4 @@
+node_modules/
+.metrics/
+coverage/
+.codemaster.local.json

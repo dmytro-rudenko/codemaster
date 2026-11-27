@@ -1,0 +1,12 @@
+{
+  "name": "codemaster",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "test": "node --test \"tests/acceptance/*.test.ts\" \"tests/modules/*.test.ts\" \"tests/helpers/**/*.test.ts\" \"tests/utils/*.test.ts\""
+  }
+}
