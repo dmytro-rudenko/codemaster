@@ -7,7 +7,7 @@
     {
       "name": "codemaster",
       "source": "./",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "description": "Code-organisation rules for TypeScript projects: a Stop hook runs deterministic checks (layout, names, parameters, nesting), a three-variant function tournament and a library digest, and the codemaster skill fixes what they find while following the project's own conventions first.",
       "category": "Development"
     }

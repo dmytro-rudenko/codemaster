@@ -11,12 +11,22 @@ import { isRepository, listAllSourceFiles, listChangedFiles } from "../helpers/i
 import { checkDeclarations } from "../helpers/logic/declaration-rules.ts";
 import { detectLayout, resolveFileRole } from "../helpers/logic/file-role.ts";
 import { checkSimplePackages, checkTestMirror } from "../helpers/logic/project-rules.ts";
+import { matchesGlob } from "../utils/glob.ts";
 import { resolveRuleSetting } from "./config.ts";
+
+async function parseClean(file: string, text: string) {
+  const root = (await parseSource(file, text)).root();
+  return root.find({ rule: { kind: "ERROR" } }) === null ? root : null;
+}
+
+function maskTypeImports(text: string): string {
+  return text.replaceAll(/(?<=typeof\s+)import\(\s*(["'])[^"'\n]*\1\s*\)/g, (match) => "_".repeat(match.length));
+}
 
 async function parseRoot(file: string, text: string) {
   try {
-    const root = (await parseSource(file, text)).root();
-    return root.find({ rule: { kind: "ERROR" } }) === null ? root : null;
+    // tree-sitter-typescript 0.51.3 fails on `f<typeof import("x")>()`; a same-length identifier keeps lines and columns.
+    return (await parseClean(file, text)) ?? (await parseClean(file, maskTypeImports(text)));
   } catch {
     return null;
   }
@@ -88,7 +98,8 @@ export async function runChecks(input: {
   config: ConfigProject;
   files: string[];
 }): Promise<{ findings: FindingItem[]; summary: FindingSummary; layout: RoleLayout }> {
-  const { projectRoot, pluginRoot, config, files } = input;
+  const { projectRoot, pluginRoot, config } = input;
+  const files = input.files.filter((file) => !config.exclude.some((pattern) => matchesGlob(file, pattern)));
   const layout = detectLayout(projectRoot, config);
   const settings = { ...config, layout };
   await loadAstGrep();

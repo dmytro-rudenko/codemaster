@@ -175,3 +175,19 @@ test("layout detection: custom role names count for layered", () => {
   assert.equal(detectLayout(projectRoot, config), "layered");
   assert.equal(detectLayout(projectRoot, CONFIG_DEFAULTS), "off");
 });
+
+test("a list of source roots resolves each file against the deepest root that holds it", () => {
+  const config: ConfigProject = { ...CONFIG_DEFAULTS, sourceRoot: ["services", "admin/src", "admin/src/lib/vendor"] };
+  assert.equal(roleOf("services/utils/format.ts", "layered", config).role, "util");
+  assert.deepEqual(roleOf("admin/src/lib/chart.ts", "layered", config), { role: "util", entity: "chart", global: false });
+  assert.equal(roleOf("admin/src/lib/vendor/chart.ts", "layered", config).role, "single-file-module");
+  assert.equal(roleOf("admin/src/api.ts", "layered", config).role, "single-file-module");
+  assert.equal(roleOf("docs/proto/page.ts", "layered", config).role, "other");
+});
+
+test("layout detection: role folders are collected across every source root", () => {
+  const config: ConfigProject = { ...CONFIG_DEFAULTS, sourceRoot: ["api", "web/src", "missing"] };
+  const projectRoot = createProject(["api/modules/user.ts", "web/src/consts/user.ts"]);
+  assert.equal(detectLayout(projectRoot, config), "layered");
+  assert.equal(detectLayout(projectRoot, { ...config, sourceRoot: ["api"] }), "off");
+});

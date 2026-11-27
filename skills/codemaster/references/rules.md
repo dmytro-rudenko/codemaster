@@ -57,7 +57,7 @@ The role of a file comes from its name without the extension, or from its folder
 - `utils`, `util` give role `util`;
 - anything else (`<entity>.service`, `<entity>.module`, `<entity>.controller`) gives role `module`.
 
-Test files (`*.test.*`, `*.spec.*`, anything under the tests folder, `tests/`, `test/`, `__tests__/`) have role `test` and only `test-mirror` concerns them. A file matching `entrypoints` has role `entrypoint`. A file outside `sourceRoot` that is not an entrypoint has role `other`: only the naming, parameter, nesting and destructuring rules apply.
+Test files (`*.test.*`, `*.spec.*`, anything under the tests folder, `tests/`, `test/`, `__tests__/`) have role `test` and only `test-mirror` concerns them. A file matching `entrypoints` has role `entrypoint`. With a list of source roots, a file is resolved against the deepest root that holds it. A file outside `sourceRoot` that is not an entrypoint has role `other`: only the naming, parameter, nesting, destructuring and `global-function` rules apply.
 
 ## Turning a rule off or changing it
 
@@ -83,7 +83,8 @@ The file is optional and lives in the project root. Unknown fields are ignored. 
 |---|---|---|
 | `hook` | boolean | `true` |
 | `layout` | `"auto"`, `"modular"`, `"layered"` or `"off"` | `"auto"` |
-| `sourceRoot` | string | `"src"` |
+| `sourceRoot` | string, or string[] with one root per package of a monorepo | `"src"` |
+| `exclude` | string[] (glob) of files `check`, the hook and `conventions` skip | `[]` |
 | `entrypoints` | string[] (glob) | `["src/index.ts", "src/main.ts", "bin/*.ts"]` |
 | `singleFileMaxLines` | number | `150` |
 | `coverageCommand` | string | detected from `package.json` |
@@ -107,7 +108,7 @@ The file is optional and lives in the project root. Unknown fields are ignored. 
 
 ### Layout detection (`layout: "auto"`)
 
-- `layered`: `sourceRoot` has folders of at least two different roles from `roles` (for example `services` and `types`).
+- `layered`: `sourceRoot` (all roots together, for a list) has folders of at least two different roles from `roles` (for example `services` and `types`).
 - `modular`: otherwise, when at least one folder in `sourceRoot` contains a file or folder with role `interfaces`, `consts` or `helper`.
 - `off`: otherwise.
 
@@ -127,7 +128,7 @@ A role with no alias found as a folder gets the full list. Add your own names, f
 
 `node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" conventions [--refresh]` scans the project and writes the profile into `.codemaster.json`. It runs by itself on the first hook run when the file is missing, but that run never executes the project's ESLint; ESLint limits are imported only by an explicit `conventions --refresh`. Every written field gets a source in `sources`: a config path (`eslint.config.js`), `dominant 83% (41/49)` or `default`.
 
-- `sourceRoot`: the first of `src`, `app`, `server`, `lib` that exists, otherwise `.`.
+- `sourceRoot`: the first of `src`, `app`, `server`, `lib` that exists. Otherwise, in a monorepo, one root per top-level folder with a `package.json` (its `src`, `app`, `server` or `lib` when present, else the folder itself), with the source `packages: <names>`. Otherwise `.`.
 - `roles`: the aliases that exist as folders in `sourceRoot` or in entity folders.
 - `testsLocation`, `testSuffix`: the share of tests next to the code against `tests/`, `test/`, `__tests__/`, and of `.test.` against `.spec.`.
 - `constantCase`, `interfacePrefix`, `entityPrefix`: taken from the existing top-level data constants, interfaces and types.

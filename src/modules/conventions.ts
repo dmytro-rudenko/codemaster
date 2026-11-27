@@ -15,6 +15,8 @@ import { isRepository, listAllSourceFiles } from "../helpers/infrastructure/git.
 import { runProcess } from "../helpers/infrastructure/process.ts";
 import { collectDeclarations } from "../helpers/logic/declaration-rules.ts";
 import { detectLayout, resolveFileRole } from "../helpers/logic/file-role.ts";
+import { matchesGlob } from "../utils/glob.ts";
+import { listSourceRoots } from "./config.ts";
 import type { CommandContext } from "../interfaces/command.ts";
 import type { ConfigProject } from "../interfaces/config.ts";
 
@@ -42,6 +44,30 @@ function walkFiles(projectRoot: string, relative: string): string[] {
   });
 }
 
+function isDirectory(path: string): boolean {
+  return existsSync(path) && statSync(path).isDirectory();
+}
+
+function findSourceRoot(projectRoot: string): { value: string | string[]; source: string } {
+  const root = CONVENTIONS_SOURCE_ROOTS.find((name) => isDirectory(join(projectRoot, name)));
+  if (root !== undefined) {
+    return { value: root, source: `found: ${root}` };
+  }
+  const packages = readdirSync(projectRoot, { withFileTypes: true })
+    .filter(({ name }) => !name.startsWith(".") && !CHECK_IGNORED_DIRECTORIES.includes(name))
+    .filter((entry) => entry.isDirectory() && existsSync(join(projectRoot, entry.name, "package.json")))
+    .map(({ name }) => name)
+    .sort();
+  if (packages.length === 0) {
+    return { value: ".", source: "default" };
+  }
+  const roots = packages.map((name) => {
+    const inner = CONVENTIONS_SOURCE_ROOTS.find((folder) => isDirectory(join(projectRoot, name, folder)));
+    return inner === undefined ? name : `${name}/${inner}`;
+  });
+  return { value: roots.length === 1 ? roots[0] : roots, source: `packages: ${packages.join(", ")}` };
+}
+
 function tally(keys: string[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const key of keys) {
@@ -59,10 +85,16 @@ function pickDominant(counts: Record<string, number>, fallback: unknown): { valu
   return { value: best, source: `dominant ${Math.round((count / total) * 100)}% (${count}/${total})` };
 }
 
-function findRoles(files: string[], sourceRoot: string): { value: unknown; source: string } {
-  const prefix = sourceRoot === "." ? "" : `${sourceRoot}/`;
-  const inside = files.filter((file) => file.startsWith(prefix));
-  const folders = new Set(inside.flatMap((file) => file.slice(prefix.length).split("/").slice(0, -1).slice(0, 3)));
+function insideRoots(files: string[], roots: string[]): string[] {
+  const prefixes = roots.map((root) => (root === "" ? "" : `${root}/`));
+  return files.flatMap((file) => {
+    const prefix = prefixes.filter((candidate) => file.startsWith(candidate)).sort((left, right) => right.length - left.length)[0];
+    return prefix === undefined ? [] : [file.slice(prefix.length)];
+  });
+}
+
+function findRoles(files: string[], roots: string[]): { value: unknown; source: string } {
+  const folders = new Set(insideRoots(files, roots).flatMap((file) => file.split("/").slice(0, -1).slice(0, 3)));
   const names = Object.values(ROLES_ALIASES).flatMap((aliases) => aliases.filter((alias) => folders.has(alias)));
   const roles = Object.entries(ROLES_ALIASES).map(([role, aliases]) => {
     const present = aliases.filter((alias) => folders.has(alias));
@@ -195,11 +227,13 @@ export async function scanConventions(
   current: { config: ConfigProject; raw: Record<string, unknown>; linter?: boolean },
 ): Promise<{ profile: Partial<ConfigProject>; sources: Record<string, string>; warnings: string[] }> {
   const { config, raw, linter = true } = current;
-  const files = isRepository(projectRoot) ? listAllSourceFiles(projectRoot) : walkFiles(projectRoot, "").sort();
-  const root = CONVENTIONS_SOURCE_ROOTS.find((name) => existsSync(join(projectRoot, name)) && statSync(join(projectRoot, name)).isDirectory()) ?? ".";
+  const listed = isRepository(projectRoot) ? listAllSourceFiles(projectRoot) : walkFiles(projectRoot, "").sort();
+  const files = listed.filter((file) => !config.exclude.some((pattern) => matchesGlob(file, pattern)));
+  const detected = findSourceRoot(projectRoot);
+  const sourceRoot = isUserOwned(raw, "sourceRoot") ? config.sourceRoot : detected.value;
   const found: Record<string, { value: unknown; source: string }> = {
-    sourceRoot: { value: root, source: root === "." ? "default" : `found: ${root}` },
-    roles: findRoles(files, root),
+    sourceRoot: detected,
+    roles: findRoles(files, listSourceRoots({ ...config, sourceRoot } as ConfigProject)),
   };
   const effective = (key: "sourceRoot" | "roles") => (isUserOwned(raw, key) ? config[key] : found[key].value);
   const scanConfig = { ...config, sourceRoot: effective("sourceRoot"), roles: effective("roles") } as ConfigProject;
@@ -211,8 +245,8 @@ export async function scanConventions(
   found.interfacePrefix = pickDominant(tally(tallies.prefixes), CONFIG_DEFAULTS.interfacePrefix);
   const entityPrefix = pickDominant(tally(tallies.entities), String(CONFIG_DEFAULTS.entityPrefix));
   found.entityPrefix = { value: entityPrefix.value === "true", source: entityPrefix.source };
-  const prefix = scanConfig.sourceRoot === "." ? "" : `${scanConfig.sourceRoot}/`;
-  const linted = files.find((file) => file.startsWith(prefix) && describeTest(file) === null) ?? files[0];
+  const prefixes = listSourceRoots(scanConfig).map((root) => (root === "" ? "" : `${root}/`));
+  const linted = files.find((file) => prefixes.some((prefix) => file.startsWith(prefix)) && describeTest(file) === null) ?? files[0];
   const linters = scanLinters(projectRoot, linted, linter);
   Object.assign(found, linters.found);
   const profile: Record<string, unknown> = {};

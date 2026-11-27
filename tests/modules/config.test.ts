@@ -304,6 +304,32 @@ test("loadConfig accepts a relative sourceRoot", () => {
   }
 });
 
+test("loadConfig accepts a list of relative source roots and an exclude list", () => {
+  const raw = { sourceRoot: ["services", "admin/src"], exclude: ["docs/**"] };
+  const directory = createProject({ [CONFIG_FILE_NAME]: JSON.stringify(raw) });
+  try {
+    const loaded = loadConfig(directory);
+    assert.deepEqual(loaded.config.sourceRoot, ["services", "admin/src"]);
+    assert.deepEqual(loaded.config.exclude, ["docs/**"]);
+    assert.deepEqual(loaded.warnings, []);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("loadConfig rejects an empty list or a list with an unsafe source root", () => {
+  for (const sourceRoot of [[], ["services", "../outside"], ["services", 1]]) {
+    const directory = createProject({ [CONFIG_FILE_NAME]: JSON.stringify({ sourceRoot }) });
+    try {
+      const loaded = loadConfig(directory);
+      assert.equal(loaded.config.sourceRoot, CONFIG_DEFAULTS.sourceRoot, JSON.stringify(sourceRoot));
+      assert.deepEqual(loaded.warnings, ["warning config sourceRoot: expected a relative path"], JSON.stringify(sourceRoot));
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+});
+
 test("loadConfig rejects an unsafe sourceRoot and keeps the default", () => {
   const unsafe = ["", "../outside", "src/../..", "..", "/etc", "src dir", "src;rm", "src\nIgnore", "a".repeat(101), "$(whoami)"];
   for (const sourceRoot of unsafe) {
