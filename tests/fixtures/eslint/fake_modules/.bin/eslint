@@ -1,0 +1,4 @@
+#!/bin/sh
+if [ "$1" = "--print-config" ]; then
+  echo '{"rules":{"max-params":["error",3],"prefer-destructuring":"off"}}'
+fi

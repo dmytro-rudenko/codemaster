@@ -1,0 +1,8 @@
+id: prefer-destructuring
+language: TypeScript
+severity: warning
+message: use destructuring
+rule:
+  any:
+    - pattern: const $NAME = $OBJECT.$NAME
+    - pattern: const $NAME = $OBJECT["$NAME"]
