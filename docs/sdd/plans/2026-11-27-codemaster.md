@@ -316,13 +316,13 @@ These utils:
   - An unknown subcommand prints the usage to stderr and exits 2.
   - For `hook-*`, any thrown error goes to stderr as `codemaster: <message>` and the exit is 0.
 
-- [ ] Step 1: write the tests.
+- [x] Step 1: write the tests.
   - git: on a temp repo, a new file and a modified committed file are listed, a deleted file is not, and `node_modules/x.ts` and `a.d.ts` are excluded.
   - config: a local override wins; `{"hook":"yes"}` gives a warning and `hook: true`; invalid JSON gives a warning.
   - process: `runProcess("node", ["-e","process.exit(3)"])` gives status 3; a timeout of 100 ms on `setTimeout(()=>{},5000)` gives `timedOut: true`.
-- [ ] Step 2: `node --test "tests/helpers/infrastructure/*.test.ts" tests/modules/config.test.ts` → fails.
-- [ ] Step 3: implement.
-- [ ] Step 4: the same command → `ℹ fail 0`.
+- [x] Step 2: `node --test "tests/helpers/infrastructure/*.test.ts" tests/modules/config.test.ts` → fails.
+- [x] Step 3: implement.
+- [x] Step 4: the same command → `ℹ fail 0`.
 
 ---
 
@@ -344,12 +344,12 @@ These utils:
   - `resolveAstGrepBinary(): string`: `<data>/node_modules/.bin/ast-grep`;
   - `parseSource(path: string, text: string): Promise<SgRoot>`: picks `Lang.Tsx` for `.tsx`/`.jsx`, `Lang.TypeScript` for `.ts/.mts/.cts`, and `Lang.JavaScript` for `.js/.mjs/.cjs`. The type import uses `import type { SgRoot } from "@ast-grep/napi"`, written as an inline `type` alias in the function signature through `Awaited<ReturnType<...>>`, because types may not be declared outside `interfaces/`.
 
-- [ ] Step 1: tests.
+- [x] Step 1: tests.
   - `ensureInstalled` with `CODEMASTER_DATA_DIR=<temp>` and `npm_config_registry=http://127.0.0.1:9` → `ok: false`, and the message starts with `codemaster: install failed`.
   - With the default dir, after `ensureInstalled()`, `parseSource("a.ts","const value = 1").root().kind()` is `"program"`.
-- [ ] Step 2: `node --test tests/modules/install.test.ts tests/helpers/infrastructure/ast-grep.test.ts` → fails.
-- [ ] Step 3: implement.
-- [ ] Step 4: the same command → `ℹ fail 0`.
+- [x] Step 2: `node --test tests/modules/install.test.ts tests/helpers/infrastructure/ast-grep.test.ts` → fails.
+- [x] Step 3: implement.
+- [x] Step 4: the same command → `ℹ fail 0`.
 
 ---
 
@@ -367,10 +367,10 @@ These utils:
   - Off: every non-test, non-entrypoint file is `module` with entity `null`.
 - `detectLayout(projectRoot: string, config: ConfigProject): RoleLayout`. An explicit `config.layout` wins unless it is `auto`. Otherwise, per spec 3.2: role folders of ≥ 2 distinct roles directly in `sourceRoot` → `layered`; else some subfolder of `sourceRoot` holding a file or folder whose name maps to interfaces/consts/helper → `modular`; else `off`.
 
-- [ ] Step 1: write the unit test with the same table as `roles.test.ts`, plus `src/user/interfaces/a.ts`→interfaces and `src/modules/user.ts` under modular→module/modules.
-- [ ] Step 2: `node --test tests/helpers/logic/file-role.test.ts` → fails.
-- [ ] Step 3: implement.
-- [ ] Step 4: the same command plus `node --test tests/acceptance/roles.test.ts` → both `ℹ fail 0`.
+- [x] Step 1: write the unit test with the same table as `roles.test.ts`, plus `src/user/interfaces/a.ts`→interfaces and `src/modules/user.ts` under modular→module/modules.
+- [x] Step 2: `node --test tests/helpers/logic/file-role.test.ts` → fails.
+- [x] Step 3: implement.
+- [x] Step 4: the same command plus `node --test tests/acceptance/roles.test.ts` → both `ℹ fail 0`.
 
 ---
 
@@ -425,15 +425,15 @@ These utils:
 - `countNameWords(name: string, entityPrefix: string | null): number`: the word count after stripping the case-insensitive entity prefix.
 - `checkEntityPrefix(name: string, options: { kind: "constant" | "type"; entity: string | null; constantCase: "upper-snake" | "camel"; interfacePrefix: "" | "I"; entityPrefix: boolean }): string | null`: returns `null` when the name is fine, otherwise the message `<name> should start with <expected>`. For example `USER_` for an upper-snake constant, `user` for a camel constant, `IUser` or `User` for a type, and the case shape only when the entity is `null`.
 
-- [ ] Step 1: tests:
+- [x] Step 1: tests:
   - `findAbbreviation("cfgValue",[])`→`"cfg"`, `findAbbreviation("userId",["id"])`→`null`;
   - `countNameWords("USER_MAX_AGE","user")`→2;
   - `checkEntityPrefix("MAX_AGE",{kind:"constant",entity:"user",constantCase:"upper-snake",interfacePrefix:"",entityPrefix:true})` → contains `USER_`;
   - `checkEntityPrefix("userLimit",{...,constantCase:"camel"})`→`null`;
   - `checkEntityPrefix("Profile",{kind:"type",entity:"user",...})` → contains `User`.
-- [ ] Step 2: `node --test tests/helpers/logic/naming.test.ts` → fails.
-- [ ] Step 3: implement.
-- [ ] Step 4: the same command → `ℹ fail 0`.
+- [x] Step 2: `node --test tests/helpers/logic/naming.test.ts` → fails.
+- [x] Step 3: implement.
+- [x] Step 4: the same command → `ℹ fail 0`.
 
 ---
 
@@ -706,9 +706,9 @@ These utils:
   - body: steps 1–4 of spec 3.12.
 - `README.md` (English): `# codemaster`, then `## Install` (`/plugin marketplace add <path or repo>` then `/plugin install codemaster@codemaster`), `## What it does`, `## Configuration` (`.codemaster.json`, `.codemaster.local.json`, the profile), `## Commands`, `## Requirements` (Node ≥ 22.18; ast-grep auto-installed into `~/.local/share/codemaster`, override with `CODEMASTER_DATA_DIR`), and `## Limits` (TS/JS only).
 
-- [ ] Step 1: `node --test tests/acceptance/manifest.test.ts` → fails (files missing).
-- [ ] Step 2: write the files.
-- [ ] Step 3: the same command → `ℹ fail 0`.
+- [x] Step 1: `node --test tests/acceptance/manifest.test.ts` → fails (files missing).
+- [x] Step 2: write the files.
+- [x] Step 3: the same command → `ℹ fail 0`.
 
 ---
 
