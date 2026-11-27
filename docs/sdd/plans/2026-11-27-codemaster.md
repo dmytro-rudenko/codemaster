@@ -400,16 +400,16 @@ These utils:
 - `countTokens(functionNode): number`: leaf nodes, excluding `comment`.
 - `countDesugared(functionNode): number`: the count of `spread_element`, `rest_pattern`, `object_pattern`, `array_pattern`, `optional_chain` (`?.`), `??` binary operators, `yield_expression`, `await_expression`, the `async` keyword (once per function), nested functions that reference an identifier declared in the outer function, `try_statement`, and `template_substitution`.
 
-- [ ] Step 1: tests on inline sources:
+- [x] Step 1: tests on inline sources:
   - `function sumList(values){let total=0;for(const value of values){if(value>0){total+=value}}return total}` → complexity 3 (for +1, if +2), block nesting 2;
   - `a(b(c(d())))` → call depth 4;
   - `p.then(x => q.then(y => y))` → one `findThenInThen` line;
   - `class Counter { bump(){ return this.value } }` → name `Counter.bump`, `usesThis` true;
   - `const add = (first, second) => first + second` → name `add`, parameterCount 2;
   - `function f({a}, ...rest){ return a?.b ?? `${rest}` }` → desugared ≥ 5.
-- [ ] Step 2: `node --test tests/helpers/logic/function-metrics.test.ts` → fails.
-- [ ] Step 3: implement.
-- [ ] Step 4: the same command → `ℹ fail 0`.
+- [x] Step 2: `node --test tests/helpers/logic/function-metrics.test.ts` → fails.
+- [x] Step 3: implement.
+- [x] Step 4: the same command → `ℹ fail 0`.
 
 ---
 
@@ -608,10 +608,10 @@ These utils:
   - `--index` only rebuilds the index;
   - it prints the lines and returns 0.
 
-- [ ] Step 1: unit test: `diffLibraries` on an inline temp project with `@scope/pkg` → `add` with that name, and the file name `scope__pkg.md` is recognised for `remove`.
-- [ ] Step 2: `node --test tests/modules/libraries.test.ts` → fails.
-- [ ] Step 3: implement.
-- [ ] Step 4: `node --test tests/modules/libraries.test.ts tests/acceptance/libraries.test.ts` → `ℹ fail 0`.
+- [x] Step 1: unit test: `diffLibraries` on an inline temp project with `@scope/pkg` → `add` with that name, and the file name `scope__pkg.md` is recognised for `remove`.
+- [x] Step 2: `node --test tests/modules/libraries.test.ts` → fails.
+- [x] Step 3: implement.
+- [x] Step 4: `node --test tests/modules/libraries.test.ts tests/acceptance/libraries.test.ts` → `ℹ fail 0`.
 
 ---
 
