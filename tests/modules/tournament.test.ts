@@ -435,3 +435,80 @@ for (const skipArguments of [["--skip"], ["--skip", "src/math.ts#scoreValues"], 
     assert.equal(existsSync(join(stateDirectory(directory), "tournament-done.json")), false);
   });
 }
+
+for (const usageArguments of [[], ["--done"]]) {
+  test(`tournament ${usageArguments.join(" ")} prints the general usage and returns 2`, () => {
+    const directory = copyFixture("candidates");
+    initRepository(directory, { commitFiles: false });
+    const result = runCli(["tournament", ...usageArguments], { cwd: directory });
+    assert.equal(result.status, 2);
+    assert.equal(
+      result.stderr,
+      "usage: codemaster tournament <dir> | --candidates | --skip <file>#<name> --reason <text> | --done <dir>\n",
+    );
+  });
+}
+
+test("tournament --candidates returns 1 with the install message when the install fails", () => {
+  const directory = copyFixture("candidates");
+  initRepository(directory, { commitFiles: false });
+  const result = runCli(["tournament", "--candidates"], {
+    cwd: directory,
+    environment: { CODEMASTER_DATA_DIR: join(directory, "src/math.ts", "data") },
+  });
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /^codemaster: install failed \(.+\)\n$/);
+});
+
+function writeTarget(functionName: string): string {
+  const tournamentDirectory = mkdtempSync(join(tmpdir(), "codemaster-done-"));
+  writeFileSync(join(tournamentDirectory, "target.json"), JSON.stringify({ file: "src/math.ts", functionName }));
+  return tournamentDirectory;
+}
+
+test("tournament --done records the body hash and the function leaves the candidates", () => {
+  const directory = copyFixture("candidates");
+  initRepository(directory, { commitFiles: false });
+  const result = runCli(["tournament", "--done", writeTarget("scoreValues")], { cwd: directory });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "");
+  const [entry] = JSON.parse(readFileSync(doneFilePath(directory), "utf8"));
+  assert.equal(entry.key, "src/math.ts#scoreValues");
+  assert.match(entry.bodyHash, /^[0-9a-f]+$/);
+  assert.equal(entry.skipped, false);
+  assert.equal(entry.reason, null);
+  const after = runCli(["tournament", "--candidates"], { cwd: directory });
+  assert.doesNotMatch(after.stdout, /scoreValues/);
+});
+
+test("tournament --done records a null body hash for a function the file no longer has", () => {
+  const directory = copyFixture("candidates");
+  initRepository(directory, { commitFiles: false });
+  const result = runCli(["tournament", "--done", writeTarget("vanished")], { cwd: directory });
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(readFileSync(doneFilePath(directory), "utf8")), [
+    { key: "src/math.ts#vanished", bodyHash: null, skipped: false, reason: null },
+  ]);
+});
+
+test("findCandidates keeps a done function whose body hash changed", async () => {
+  const directory = copyFixture("candidates");
+  initRepository(directory, { commitFiles: false });
+  writeFileSync(
+    doneFilePath(directory),
+    JSON.stringify([{ key: "src/math.ts#scoreValues", bodyHash: "stale", skipped: false, reason: null }]),
+  );
+  const candidates = await findCandidates({ projectRoot: directory, config: CONFIG_DEFAULTS });
+  assert.deepEqual(candidates.map(({ functionName }) => functionName), ["scoreValues"]);
+});
+
+test("findCandidates takes a function by body lines alone and drops it below both thresholds", async () => {
+  const directory = copyFixture("candidates");
+  initRepository(directory, { commitFiles: false });
+  const byLines = { ...CONFIG_DEFAULTS, tournament: { ...CONFIG_DEFAULTS.tournament, minComplexity: 99, minLines: 9 } };
+  const tooShort = { ...CONFIG_DEFAULTS, tournament: { ...CONFIG_DEFAULTS.tournament, minComplexity: 99, minLines: 10 } };
+  const listed = await findCandidates({ projectRoot: directory, config: byLines });
+  assert.deepEqual(listed.map(({ functionName, lines }) => `${functionName} ${lines}`), ["scoreValues 9"]);
+  assert.deepEqual(await findCandidates({ projectRoot: directory, config: tooShort }), []);
+});

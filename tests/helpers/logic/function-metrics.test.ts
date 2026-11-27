@@ -248,3 +248,18 @@ for (const [label, source, expected] of BINDING_CASES) {
     assert.equal(countDesugared(outer.node), expected);
   });
 }
+
+test("a method outside a class declaration takes the bare method name", async () => {
+  const functions = await functionsOf("const tools = { run() { return 1 } };\nconst Shape = class { area() { return 2 } };");
+  assert.deepEqual(functions.map((entry) => entry.name), ["run", "area"]);
+});
+
+test("a generator declaration takes its name and an arrow in call arguments stays unnamed", async () => {
+  const functions = await functionsOf("function* sequence() { yield 1 }\nconst total = reduce(() => 0);");
+  assert.deepEqual(functions.map((entry) => entry.name), ["sequence", null]);
+});
+
+test("a bare call to a method's own name inside a class is not counted as recursion", async () => {
+  const bump = await functionNamed("class Counter { bump(){ return bump() } }", "Counter.bump");
+  assert.equal(measureCognitiveComplexity(bump.node), 0);
+});

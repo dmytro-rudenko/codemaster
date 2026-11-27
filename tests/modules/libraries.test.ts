@@ -272,6 +272,36 @@ test("rebuildIndex writes the skill frontmatter and one line per summary", () =>
   }
 });
 
+test("rebuildIndex takes the purpose's first sentence and handles missing, empty and unterminated purposes", () => {
+  const frontmatter = (name: string) => `---\nname: ${name}\nversion: 1.0.0\n---\n\n`;
+  const directory = createProject({
+    summaries: {
+      "alpha.md": summaryText("alpha", "1.0.0", "Alpha\n  renders   pages.\nIt also does more."),
+      "beta.md": summaryText("beta", "1.0.0", "Beta renders pages"),
+      "delta.md": `${frontmatter("delta")}## Purpose\n## Key APIs\n- call()\n`,
+      "epsilon.md": summaryText("epsilon", "1.0.0", ""),
+      "gamma.md": `${frontmatter("gamma")}## Key APIs\n- call()\n`,
+      "kappa.md": `${frontmatter("kappa")}## Key APIs\n- call()\n\n## Purpose \t\nKappa is last! Really.`,
+      "zeta.md": "## Purpose\nZeta uses e.g. caching. More.\n",
+    },
+  });
+  try {
+    rebuildIndex(directory);
+    const rows = readIndex(directory).split("\n").filter((line) => line.startsWith("- ["));
+    assert.deepEqual(rows, [
+      "- [alpha](alpha.md) — Alpha renders pages.",
+      "- [beta](beta.md) — Beta renders pages",
+      "- [delta](delta.md) — ## Key APIs - call()",
+      "- [epsilon](epsilon.md)",
+      "- [gamma](gamma.md)",
+      "- [kappa](kappa.md) — Kappa is last!",
+      "- [zeta](zeta.md) — Zeta uses e.g.",
+    ]);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("rebuildIndex does not list SKILL.md itself on a second run", () => {
   const directory = createProject({ summaries: { "alpha.md": summaryText("alpha", "1.2.0", "Alpha renders pages.") } });
   try {

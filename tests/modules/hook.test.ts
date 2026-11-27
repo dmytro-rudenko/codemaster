@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { join, resolve } from "node:path";
@@ -210,6 +210,138 @@ test("hook-stop puts config warnings into the reason", async () => {
     const context = stopContext(projectRoot, ["warning config .codemaster.local.json: invalid JSON"]);
     const { output } = await captureOutput(() => runCommand(context));
     assert.ok(JSON.parse(output).reason.includes("warning config .codemaster.local.json: invalid JSON"), output);
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+function lastCheckedPath(projectRoot: string): string {
+  return join(projectRoot, ".git", "codemaster", "last-checked");
+}
+
+const CLEAN_HOME_SOURCE = "export function home() {\n  return 1;\n}\n";
+
+test("hook-stop stays silent and records nothing when the hook is off", async () => {
+  const projectRoot = createRepository();
+  try {
+    writeFileSync(join(projectRoot, ".codemaster.json"), "{\"libraryDigest\":false,\"hook\":false}\n");
+    const { status, output } = await captureOutput(() => runCommand(stopContext(projectRoot)));
+    assert.equal(status, 0);
+    assert.equal(output, "");
+    assert.equal(existsSync(lastCheckedPath(projectRoot)), false);
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("hook-stop stays silent and records nothing when no file changed", async () => {
+  const projectRoot = createRepository();
+  try {
+    rmSync(join(projectRoot, "src"), { recursive: true, force: true });
+    rmSync(join(projectRoot, ".codemaster.json"));
+    const { status, output } = await captureOutput(() => runCommand(stopContext(projectRoot)));
+    assert.equal(status, 0);
+    assert.equal(output, "");
+    assert.equal(existsSync(lastCheckedPath(projectRoot)), false);
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("an active stop hook records the state without blocking so the next stop stays silent", async () => {
+  const projectRoot = createRepository();
+  try {
+    const active = { ...stopContext(projectRoot), input: JSON.stringify({ cwd: projectRoot, stop_hook_active: true }) };
+    const first = await captureOutput(() => runCommand(active));
+    assert.equal(first.output, "");
+    assert.equal(existsSync(lastCheckedPath(projectRoot)), true);
+    const second = await captureOutput(() => runCommand(stopContext(projectRoot)));
+    assert.equal(second.output, "");
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("hook-stop with an empty input runs as an inactive stop", async () => {
+  ensureInstalled();
+  const projectRoot = createRepository();
+  try {
+    const { output } = await captureOutput(() => runCommand({ ...stopContext(projectRoot), input: "" }));
+    assert.equal(JSON.parse(output).decision, "block");
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("a failed install is written to stderr, returns 0 and leaves the state unrecorded", async () => {
+  const projectRoot = createRepository();
+  const saved = process.env.CODEMASTER_DATA_DIR;
+  const originalStderr = process.stderr.write;
+  const written: string[] = [];
+  try {
+    process.env.CODEMASTER_DATA_DIR = join(projectRoot, "src/pages/home.ts", "data");
+    process.stderr.write = ((chunk: string | Uint8Array) => written.push(String(chunk)) > 0) as typeof process.stderr.write;
+    const { status, output } = await captureOutput(() => runCommand(stopContext(projectRoot)));
+    process.stderr.write = originalStderr;
+    assert.equal(status, 0);
+    assert.equal(output, "");
+    assert.equal(written.length, 1);
+    assert.match(written[0], /^codemaster: install failed \(.+\)\n$/);
+    assert.equal(existsSync(lastCheckedPath(projectRoot)), false);
+  } finally {
+    process.stderr.write = originalStderr;
+    if (saved === undefined) {
+      delete process.env.CODEMASTER_DATA_DIR;
+    } else {
+      process.env.CODEMASTER_DATA_DIR = saved;
+    }
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("a clean change records the state without blocking", async () => {
+  ensureInstalled();
+  const projectRoot = createRepository();
+  try {
+    writeFileSync(join(projectRoot, "src/pages/home.ts"), CLEAN_HOME_SOURCE);
+    const { status, output } = await captureOutput(() => runCommand(stopContext(projectRoot)));
+    assert.equal(status, 0);
+    assert.equal(output, "");
+    assert.equal(existsSync(lastCheckedPath(projectRoot)), true);
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("a clean change still blocks with tournament candidates", async () => {
+  ensureInstalled();
+  const projectRoot = createRepository();
+  try {
+    writeFileSync(join(projectRoot, ".codemaster.json"), "{\"libraryDigest\":false,\"tournament\":{\"minLines\":1}}\n");
+    writeFileSync(join(projectRoot, "src/pages/home.ts"), CLEAN_HOME_SOURCE);
+    const { output } = await captureOutput(() => runCommand(stopContext(projectRoot)));
+    const { reason } = JSON.parse(output);
+    const lines = reason.split("\n");
+    assert.ok(lines.includes("Tournament candidates (1):"), reason);
+    assert.ok(lines.includes("src/pages/home.ts:1 home complexity=0 lines=1"), reason);
+    assert.ok(!reason.includes("Findings ("), reason);
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("a clean change still blocks with the library digest when it is on", async () => {
+  ensureInstalled();
+  const projectRoot = createRepository();
+  try {
+    writeFileSync(join(projectRoot, ".codemaster.json"), "{}\n");
+    writeFileSync(join(projectRoot, "package.json"), "{\"dependencies\":{\"alpha\":\"1.0.0\"}}\n");
+    writeFileSync(join(projectRoot, "src/pages/home.ts"), CLEAN_HOME_SOURCE);
+    const { output } = await captureOutput(() => runCommand(stopContext(projectRoot)));
+    const { reason } = JSON.parse(output);
+    const lines = reason.split("\n");
+    assert.ok(lines.includes("Libraries:"), reason);
+    assert.ok(lines.includes("missing alpha (not installed)"), reason);
   } finally {
     rmSync(projectRoot, { recursive: true, force: true });
   }

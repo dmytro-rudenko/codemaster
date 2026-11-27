@@ -1,5 +1,6 @@
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -377,6 +378,114 @@ test("runCommand leaves an invalid .codemaster.json untouched and returns 1", as
         written.join("").split("\n").includes("warning config .codemaster.json: invalid JSON; profile not written"),
         written.join(""),
       );
+    },
+  );
+});
+
+test("ESLint naming-convention with formats and a global modifier gives upper-snake", async () => {
+  await withProject({ "src/modules/user.ts": "export {};\n" }, async (directory) => {
+    writeFakeEslint(
+      directory,
+      printConfigScript({
+        "@typescript-eslint/naming-convention": ["error", { selector: ["variable"], modifiers: "global", formats: ["CONSTANT_CASE"] }],
+      }),
+    );
+    const { profile, sources } = await scan(directory);
+    assert.equal(profile.constantCase, "upper-snake");
+    assert.equal(sources.constantCase, "eslint --print-config");
+  });
+});
+
+test("ESLint naming-conventions without one format, a const modifier or an I prefix map nothing", async () => {
+  const conventions = [
+    { selector: "variable", modifiers: ["const"], format: ["camelCase", "UPPER_CASE"] },
+    { selector: "variable", format: ["camelCase"] },
+    { selector: "variable", modifiers: ["const"] },
+    { selector: "variable", modifiers: ["const"], format: ["PascalCase"] },
+    { selector: "interface", format: ["PascalCase"] },
+    { selector: "interface", prefix: ["T"] },
+  ];
+  for (const convention of conventions) {
+    await withProject({ "src/modules/user.ts": "export {};\n" }, async (directory) => {
+      writeFakeEslint(directory, printConfigScript({ "@typescript-eslint/naming-convention": ["error", convention] }));
+      const { sources } = await scan(directory);
+      assert.equal(sources.constantCase, "default", JSON.stringify(convention));
+      assert.equal(sources.interfacePrefix, "default", JSON.stringify(convention));
+    });
+  }
+});
+
+test("Biome useNamingConvention CONSTANT_CASE for const maps to upper-snake", async () => {
+  await withProject(
+    {
+      "src/modules/user.ts": "export {};\n",
+      "biome.json": JSON.stringify({
+        linter: {
+          rules: {
+            style: {
+              useNamingConvention: { options: { conventions: [{ selector: { kind: "const" }, formats: ["CONSTANT_CASE"] }] } },
+            },
+          },
+        },
+      }),
+    },
+    async (directory) => {
+      const { profile, sources } = await scan(directory);
+      assert.equal(profile.constantCase, "upper-snake");
+      assert.equal(sources.constantCase, "biome.json");
+    },
+  );
+});
+
+test("constants in neither upper-snake nor camel case keep the default constantCase", async () => {
+  const mixed = Array.from({ length: 5 }, (_, position) => `export const Limit_${position} = ${position};\n`).join("");
+  await withProject({ "src/types/a.ts": "export interface Thing { name: string }\n", "src/constants/a.ts": mixed }, async (directory) => {
+    const { profile, sources } = await scan(directory);
+    assert.equal(profile.constantCase, CONFIG_DEFAULTS.constantCase);
+    assert.equal(sources.constantCase, "default");
+  });
+});
+
+test("a user-owned sourceRoot drives the declaration scan and is left out of the profile", async () => {
+  await withProject({ "src/modules/user.ts": "export {};\n", "lib/types/a.ts": "export interface Thing { name: string }\n", "lib/constants/a.ts": camelConstants(5) }, async (directory) => {
+    const { profile, sources } = await scan(directory, { sourceRoot: "lib" });
+    assert.equal(Object.hasOwn(profile, "sourceRoot"), false);
+    assert.equal(profile.constantCase, "camel");
+    assert.equal(sources.constantCase, "dominant 100% (5/5)");
+  });
+});
+
+test("test files in a tests folder without a suffix set the location and keep the default suffix", async () => {
+  await withProject({ "src/main.ts": "export {};\n", ...numberedFiles("tests/case", ".ts", 5) }, async (directory) => {
+    const { profile, sources } = await scan(directory);
+    assert.equal(profile.testsLocation, "tests");
+    assert.equal(profile.testSuffix, CONFIG_DEFAULTS.testSuffix);
+    assert.equal(sources.testSuffix, "default");
+  });
+});
+
+test("ESLint reads the first file when every file is a test", async () => {
+  await withProject({ "tests/a.test.ts": "export {};\n", "tests/b.test.ts": "export {};\n" }, async (directory) => {
+    writeFakeEslint(directory, printConfigScript({}));
+    await scan(directory);
+    const received = readFileSync(join(directory, "node_modules", ".bin", "received"), "utf8").trim().split("\n");
+    assert.ok(received[1]?.endsWith("tests/a.test.ts"), received.join(" "));
+  });
+});
+
+test("inside a repository the ignored files are left out of the scan", async () => {
+  await withProject(
+    {
+      ".gitignore": "src/constants/generated.ts\n",
+      "src/types/a.ts": "export interface Thing { name: string }\n",
+      "src/constants/a.ts": camelConstants(5),
+      "src/constants/generated.ts": upperConstants(20),
+    },
+    async (directory) => {
+      execFileSync("git", ["init", "-q"], { cwd: directory });
+      const { profile, sources } = await scan(directory);
+      assert.equal(profile.constantCase, "camel");
+      assert.equal(sources.constantCase, "dominant 100% (5/5)");
     },
   );
 });

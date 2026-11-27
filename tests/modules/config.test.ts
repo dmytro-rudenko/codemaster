@@ -212,3 +212,17 @@ test("resolveRuleSetting reads off, a severity string and an object setting", ()
     reason: null,
   });
 });
+
+test("resolveRuleSetting falls back to the rule's own severity and drops values of the wrong type", () => {
+  const ruleId = "name-word-count";
+  const withRule = (setting: unknown) => ({ ...CONFIG_DEFAULTS, rules: { [ruleId]: setting } }) as typeof CONFIG_DEFAULTS;
+  const enabledWarning = { enabled: true, severity: "warning", max: null, reason: null };
+  assert.deepEqual(resolveRuleSetting(withRule("error"), ruleId), { ...enabledWarning, severity: "error" });
+  assert.deepEqual(resolveRuleSetting(withRule("loud"), ruleId), enabledWarning);
+  assert.deepEqual(resolveRuleSetting(withRule(["error", 3]), ruleId), enabledWarning);
+  assert.deepEqual(resolveRuleSetting(withRule(null), ruleId), enabledWarning);
+  assert.deepEqual(resolveRuleSetting(withRule({ severity: "info", max: "3", reason: 7 }), ruleId), enabledWarning);
+  assert.deepEqual(resolveRuleSetting(withRule({ severity: "error" }), ruleId), { ...enabledWarning, severity: "error" });
+  assert.deepEqual(resolveRuleSetting(withRule("off"), ruleId), { enabled: false, severity: "warning", max: null, reason: null });
+  assert.deepEqual(resolveRuleSetting(CONFIG_DEFAULTS, "no-such-rule"), { ...enabledWarning, severity: "error" });
+});

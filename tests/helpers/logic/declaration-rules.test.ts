@@ -77,6 +77,18 @@ const DATA_CASES: [string, boolean][] = [
   ["Router()", false],
   ["new Map()", false],
   ["{ create() {} }", false],
+  ["`plain text`", true],
+  ["`user ${name}`", false],
+  ["-1", true],
+  ["-limit", false],
+  ["!0", false],
+  ["/a+/", true],
+  ["null", true],
+  ['[1, ["a"]]', true],
+  ["[limit]", false],
+  ["{ a: 1 } satisfies object", true],
+  ["Object.freeze(1, 2)", false],
+  ["Object.assign({})", false],
 ];
 
 for (const [expression, expected] of DATA_CASES) {
@@ -228,6 +240,13 @@ test("global-function stays silent on data assigned to globalThis", async () => 
   expectNone(await checkSource("globalThis.counter = 5;\n", role), "global-function");
 });
 
+test("global-function stays silent on a function assigned to a plain object member or a variable", async () => {
+  const role = roleFor("module", "src/user/user.service.ts", "user");
+  for (const text of ["registry.runTask = () => 1;\n", "let runTask;\nrunTask = () => 1;\n", "this.runTask = () => 1;\n"]) {
+    expectNone(await checkSource(text, role), "global-function");
+  }
+});
+
 test("global-function fires on a declare global block with a function member", async () => {
   const role = roleFor("module", "src/user/user.service.ts", "user");
   const text = "declare global {\n  function runTask(): void;\n}\nexport {};\n";
@@ -302,6 +321,18 @@ test("name-abbreviation fires on a variable inside a function, a class, a method
 test("name-abbreviation reports an abbreviated arrow constant once", async () => {
   const role = roleFor("helper", "src/user/user.helpers.ts", "user");
   expectOne(await checkSource("export const loadCfg = () => 1;\n", role), "name-abbreviation", role.path);
+});
+
+test("name-abbreviation fires on a bare arrow parameter and an optional parameter", async () => {
+  const role = roleFor("module", "src/user/user.service.ts", "user");
+  for (const text of ["export const loadUser = cfg => cfg;\n", "export function loadUser(cfg?: string) { return cfg; }\n"]) {
+    assert.equal(expectOne(await checkSource(text, role), "name-abbreviation", role.path).message, "cfg contains abbreviation cfg");
+  }
+});
+
+test("name-abbreviation skips destructured parameters", async () => {
+  const role = roleFor("module", "src/user/user.service.ts", "user");
+  expectNone(await checkSource("export function loadUser({ cfg }: { cfg: string }, [tmp]: string[]) { return cfg + tmp; }\n", role), "name-abbreviation");
 });
 
 test("name-word-count fires on a name of more than three words", async () => {

@@ -194,6 +194,17 @@ test("ensureInstalled falls back to the exit status when stderr is empty", async
   });
 });
 
+test("ensureInstalled quotes the spawn error when npm is not on the PATH", async () => {
+  const root = mkdtempSync(join(tmpdir(), "codemaster-install-"));
+  try {
+    await withVariables({ CODEMASTER_DATA_DIR: join(root, "data"), PATH: join(root, "empty") }, () => {
+      assert.deepEqual(ensureInstalled(), { ok: false, message: "codemaster: install failed (spawnSync npm ENOENT)" });
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("ensureInstalled reports a failed install when the registry is unreachable", async () => {
   const dataDirectory = mkdtempSync(join(tmpdir(), "codemaster-install-"));
   try {
