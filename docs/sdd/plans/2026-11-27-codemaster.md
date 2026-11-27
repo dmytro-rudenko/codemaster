@@ -545,10 +545,10 @@ These utils:
   - `--json`: `JSON.stringify({ findings, summary })`;
   - returns 1 when `E > 0`, else 0.
 
-- [ ] Step 1: unit test: `runChecks` on an inline temp project with one `max-params` violation and `rules: {"max-params": {"severity": "warning", "reason": "legacy"}}` → severity `warning`, `reason: "legacy"`, and `summary.errors === 0`.
-- [ ] Step 2: `node --test tests/modules/check.test.ts` → fails.
-- [ ] Step 3: implement.
-- [ ] Step 4: `node --test tests/modules/check.test.ts "tests/acceptance/check.test.ts"` → `ℹ fail 0`.
+- [x] Step 1: unit test: `runChecks` on an inline temp project with one `max-params` violation and `rules: {"max-params": {"severity": "warning", "reason": "legacy"}}` → severity `warning`, `reason: "legacy"`, and `summary.errors === 0`.
+- [x] Step 2: `node --test tests/modules/check.test.ts` → fails.
+- [x] Step 3: implement.
+- [x] Step 4: `node --test tests/modules/check.test.ts "tests/acceptance/check.test.ts"` → `ℹ fail 0`.
 
 ---
 
@@ -580,10 +580,10 @@ These utils:
 - `formatProfile(profile, sources): string`: lines `codemaster profile:` then `  <field> = <JSON value>  (<source>)` for `layout`, `sourceRoot`, `roles`, `testsLocation`, `testSuffix`, `constantCase`, `interfacePrefix`, `entityPrefix` and `rules`. `layout` is the result of `detectLayout`.
 - `runCommand`: `--refresh` or a missing file → scan, write, print `formatProfile` to stdout, return 0. With an existing file and no `--refresh` → print the current profile and return 0.
 
-- [ ] Step 1: unit test: on a temp project with only `src/types/a.ts` and 5 UPPER constants in `src/constants/a.ts` → `roles.interfaces` = `["types"]`, `constantCase` = `upper-snake` with a dominant source.
-- [ ] Step 2: `node --test tests/modules/conventions.test.ts` → fails.
-- [ ] Step 3: implement.
-- [ ] Step 4: `node --test tests/modules/conventions.test.ts tests/acceptance/conventions.test.ts` → `ℹ fail 0`, except the hook-dependent cases (none in this file).
+- [x] Step 1: unit test: on a temp project with only `src/types/a.ts` and 5 UPPER constants in `src/constants/a.ts` → `roles.interfaces` = `["types"]`, `constantCase` = `upper-snake` with a dominant source.
+- [x] Step 2: `node --test tests/modules/conventions.test.ts` → fails.
+- [x] Step 3: implement.
+- [x] Step 4: `node --test tests/modules/conventions.test.ts tests/acceptance/conventions.test.ts` → `ℹ fail 0`, except the hook-dependent cases (none in this file).
 
 ---
 
