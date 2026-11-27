@@ -303,6 +303,15 @@ function parameterNodes(functionNode: SgNode): SgNode[] {
     .filter((entry): entry is SgNode => entry !== null && entry.kind() === "identifier");
 }
 
+function isKnownKind(root: SgNode, kind: string): boolean {
+  try {
+    root.matches({ rule: { kind } });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function collectNameNodes(root: SgNode): SgNode[] {
   const namedKinds = [
     "variable_declarator",
@@ -318,7 +327,7 @@ function collectNameNodes(root: SgNode): SgNode[] {
     "method_definition",
   ];
   const declared = root
-    .findAll({ rule: { any: namedKinds.map((kind) => ({ kind })) } })
+    .findAll({ rule: { any: namedKinds.filter((kind) => isKnownKind(root, kind)).map((kind) => ({ kind })) } })
     .map((node) => node.field("name"))
     .filter((name): name is SgNode => name !== null && name.kind() !== "array_pattern" && name.kind() !== "object_pattern");
   const parameters = listFunctions(root).flatMap((entry) => parameterNodes(entry.node));

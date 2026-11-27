@@ -330,6 +330,23 @@ test("name-abbreviation fires on a bare arrow parameter and an optional paramete
   }
 });
 
+for (const extension of [".js", ".jsx", ".mjs", ".cjs"]) {
+  test(`checkDeclarations on a ${extension} source reports max-params and name-abbreviation without throwing`, async () => {
+    const role = roleFor("module", `src/user/user.service${extension}`, "user");
+    const text = "export function loadUser(first, second, third, fourth, fifth, sixth) {\n  const cfg = first;\n  return cfg;\n}\n";
+    const findings = await checkSource(text, role);
+    expectOne(findings, "max-params", role.path);
+    assert.equal(expectOne(findings, "name-abbreviation", role.path).message, "cfg contains abbreviation cfg");
+  });
+}
+
+test("name-abbreviation fires on a bare and a defaulted parameter of a JavaScript function", async () => {
+  const role = roleFor("module", "src/user/user.service.js", "user");
+  for (const text of ["export function loadUser(cfg) { return cfg; }\n", "export function loadUser(cfg = 1) { return cfg; }\n"]) {
+    assert.equal(expectOne(await checkSource(text, role), "name-abbreviation", role.path).message, "cfg contains abbreviation cfg");
+  }
+});
+
 test("name-abbreviation skips destructured parameters", async () => {
   const role = roleFor("module", "src/user/user.service.ts", "user");
   expectNone(await checkSource("export function loadUser({ cfg }: { cfg: string }, [tmp]: string[]) { return cfg + tmp; }\n", role), "name-abbreviation");
