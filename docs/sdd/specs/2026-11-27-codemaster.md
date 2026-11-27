@@ -13,6 +13,14 @@
 
 ## 2. Constraint that shapes the solution
 
+**Стиль проєкту важливіший за правила плагіна.** Плагін вписується в проєкт, його код, правила й пріоритети розробника; назви папок (`modules`, `services`, `helpers`, `utils`, `consts`) і будь-які конвенції підлаштовуються під проєкт, а не навпаки. Порядок пріоритетів:
+
+1. явні правила проєкту: `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING*`, конфіги лінтера (ESLint, Biome);
+2. домінантні конвенції наявного коду;
+3. типові значення codemaster — лише там, де проєкт мовчить.
+
+Тому кожне правило читає профіль проєкту (3.2a), плагін ніколи не пропонує перейменувати наявні папки під свої назви, а будь-яке правило вимикається чи налаштовується в `.codemaster.json`.
+
 **Правила мають перевірятися детерміновано на TS/JS зараз і бути переносними на інші мови потім, а хук `Stop` у Claude Code спрацьовує після кожної відповіді.**
 
 - **Рушій — ast-grep** (tree-sitter, правила в YAML, ~25 мов). Відкинуто ESLint + typescript-eslint (лише TS/JS, конфлікт із власним ESLint-конфігом проєкту) і власний скрипт на TypeScript compiler API (лише TS/JS, кожне правило руками). Розклад папок і дзеркало тестів ast-grep не бачить, їх перевіряє Node-скрипт.
@@ -38,7 +46,7 @@ skills/codemaster/references/     rules.md, tournament.md, libraries.md
 skills/codemaster-audit/SKILL.md  прогін по наявному коду (3.12)
 rules/typescript/*.yml            правила ast-grep, один файл на rule-id
 src/                              код плагіна, розклад «по шарах»
-  modules/                        check.ts, tournament.ts, libraries.ts, hook.ts, install.ts
+  modules/                        check.ts, conventions.ts, tournament.ts, libraries.ts, hook.ts, install.ts
   consts/  interfaces/  utils/
   helpers/infrastructure/         git, файлова система, запуск процесів
   helpers/external/               npm registry
@@ -59,7 +67,6 @@ README.md                         англійською
 | `hook` | boolean | `true` |
 | `layout` | `"auto" \| "modular" \| "layered" \| "off"` | `"auto"` |
 | `sourceRoot` | string | `"src"` |
-| `testsRoot` | string | `"tests"` (лише для `layered`) |
 | `entrypoints` | string[] (glob) | `["src/index.ts", "src/main.ts", "bin/*.ts"]` |
 | `singleFileMaxLines` | number | `150` |
 | `coverageCommand` | string | автовизначення (3.11) |
@@ -72,12 +79,43 @@ README.md                         англійською
 | `libraryDigest` | boolean | `true` |
 | `libraryDigestDev` | boolean | `false` (чи включати `devDependencies`) |
 | `libraryDigestPerRun` | number | `5` |
+| `roles` | `{module, interfaces, consts, helper, util: string[]}` | псевдоніми з 3.2a |
+| `testsLocation` | `"colocated" \| "<папка>"` | з 3.2a, інакше `colocated` для `modular` і `tests` для `layered` |
+| `testSuffix` | `"test" \| "spec"` | з 3.2a, інакше `test` |
+| `constantCase` | `"upper-snake" \| "camel"` | з 3.2a, інакше `upper-snake` |
+| `interfacePrefix` | `"" \| "I"` | з 3.2a, інакше `""` |
+| `entityPrefix` | boolean | з 3.2a, інакше `true` |
+| `rules` | `{"<rule-id>": "off" \| "error" \| "warning" \| {severity?, max?, reason?}}` | `{}` |
+| `sources` | `{"<поле>": "<джерело>"}` | пише `conventions` |
 
 Невідомі поля ігноруються; поле хибного типу дає один рядок `warning config <поле>: expected <тип>` і типове значення. Конфіг читається й перевіряється один раз у `main`, далі модулі отримують готовий об'єкт.
 
 `.codemaster.local.json` поруч (той самий формат, поля перекривають `.codemaster.json`) — особисті перемикачі розробника; `install` нічого не робить із `.gitignore`, а скіл при першому створенні локального файлу додає його в `.gitignore` проєкту. *(Моє рішення: щоб один розробник не вимикав функцію всій команді.)*
 
-**Визначення розкладу при `auto`:** якщо в `sourceRoot` є хоча б дві з папок `modules`, `services`, `interfaces`, `consts`, `helpers` — `layered`; інакше якщо хоча б одна папка в `sourceRoot` містить файл чи папку з роллю `interfaces`, `consts` або `helper` (3.3) — `modular`; інакше — `off`. При `off` правила розкладу (`layout-forbidden-declaration`, `helpers-only-functions`, `test-mirror`, `helpers-mixed-kind`, `name-entity-prefix`, `single-file-module-size`) не застосовуються, решта правил працює. *(Моє рішення.)*
+**Визначення розкладу при `auto`:** якщо в `sourceRoot` є папки щонайменше двох різних ролей з `roles` (наприклад `services` і `types`) — `layered`; інакше якщо хоча б одна папка в `sourceRoot` містить файл чи папку з роллю `interfaces`, `consts` або `helper` (3.3) — `modular`; інакше — `off`. При `off` правила розкладу (`layout-forbidden-declaration`, `helpers-only-functions`, `test-mirror`, `helpers-mixed-kind`, `name-entity-prefix`, `single-file-module-size`) не застосовуються, решта правил працює. *(Моє рішення.)*
+
+### 3.2a. `codemaster conventions [--refresh]` — профіль проєкту
+
+Запускається автоматично на першому прогоні хука, коли `.codemaster.json` немає, і вручну з `--refresh`. Сканує проєкт і записує профіль у `.codemaster.json`. Поле, яке вже є у файлі без запису в `sources` (його заповнив користувач), сканер ніколи не перезаписує. Для кожного записаного поля в `sources` фіксується джерело: шлях конфігу (`eslint.config.js`), `dominant 83% (41/49)` або `default`.
+
+- **`sourceRoot`:** перша наявна з `src`, `app`, `server`, `lib`; інакше `.`.
+- **`roles`:** для кожної ролі — ті псевдоніми, які справді є як папки в `sourceRoot` або в папках сутностей (як папка чи ім'я файлу з 3.3):
+  - `module` — `modules`, `services`, `controllers`, `features`, `domains`, `handlers`;
+  - `interfaces` — `interfaces`, `types`, `typings`, `contracts`, `dto`;
+  - `consts` — `consts`, `constants`, `enums`;
+  - `helper` — `helpers`;
+  - `util` — `utils`, `util`, `shared`, `common`, `lib`.
+
+  Роль без жодного знайденого псевдоніма отримує повний список. Користувач може додати власні назви (наприклад `"helper": ["support"]`).
+- **`testsLocation` і `testSuffix`:** частка тестових файлів поруч із кодом проти тестів у `tests/`, `test/`, `__tests__/`; частка `.test.` проти `.spec.`.
+- **`constantCase`, `interfacePrefix`, `entityPrefix`:** серед наявних констант-даних верхнього рівня (визначення з `layout-forbidden-declaration`), інтерфейсів і типів.
+- **Поріг домінантності:** ≥ 60 % і щонайменше 5 випадків; інакше — типове значення codemaster.
+- **Правила лінтера → `rules`:** якщо є `node_modules/.bin/eslint`, сканер для одного файлу з `sourceRoot` викликає `eslint --print-config <file>` (конфіг проєкту не виконується вручну) і переносить: `max-params` → `rules.max-params.max` (або `off`), `max-depth` → `rules.max-nesting.max`, `prefer-destructuring: off` → `rules.prefer-destructuring: "off"`, `@typescript-eslint/naming-convention` для `variable`/`interface` → `constantCase`/`interfacePrefix`. Без ESLint — з `biome.json` (`complexity.useMaxParams`, `style.useNamingConvention`). Без обох — нічого.
+- **Вивід.** Після першого сканування хук додає профіль одним блоком на початок звіту `Stop` (поле → значення → джерело), щоб розробник побачив і за потреби виправив `.codemaster.json`.
+
+Скрипт не розбирає вільний текст `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING*` — їх читає Claude у скілі (3.11).
+
+**Налаштування правил.** `rules.<id>`: `"off"` — правило не запускається; `"error"`/`"warning"` — новий рівень; об'єкт — `severity`, ліміт `max` (для `max-params`, `max-nesting`, `max-call-nesting`, `name-word-count`, `single-file-module-size`) і `reason` (друкується в звіті `check` при `--json` і у скілі).
 
 ### 3.3. Роль файлу
 
@@ -93,9 +131,11 @@ README.md                         англійською
 
 Приклади: `user/user.interfaces.ts` → `interfaces`, `user/types.ts` → `interfaces`, `user/user.service.ts` → `module`. *(Моє рішення.)*
 
-- **layered:** перший сегмент шляху всередині `sourceRoot` — `modules`/`services` → `module`; `interfaces` → `interfaces`; `consts` → `consts`; `helpers` → `helper`; `utils` → `util`. Сутність — другий сегмент (папка або ім'я файлу без розширення). Файл прямо в `modules/`, `services/` або `sourceRoot` (не в папці сутності) → `single-file-module`. Файл прямо в `consts/` чи `interfaces/` з іменем `global`, `globals`, `shared` або `index` — глобальний, без сутності.
+Списки вище — типові; насправді роль визначається за `roles` з профілю (3.2a), тож `types/` чи `constants/` проєкту працюють так само, як `interfaces/` і `consts/`. У повідомленнях `check` папки названо так, як у проєкті.
+
+- **layered:** перший сегмент шляху всередині `sourceRoot` належить до однієї з `roles` → ця роль. Сутність — другий сегмент (папка або ім'я файлу без розширення). Файл прямо в папці ролі `module` або в `sourceRoot` (не в папці сутності) → `single-file-module`. Файл прямо в папці ролі `consts` чи `interfaces` з іменем `global`, `globals`, `shared` або `index` — глобальний, без сутності.
 - **modular:** `utils/` → `util`. У папці сутності `<entity>/` роль визначає розпізнавання імені. Сутність — ім'я папки. Файл прямо в `sourceRoot` (не в папці) → `single-file-module`. Папка сутності `global` або `shared` — глобальна: правило `name-entity-prefix` до неї не застосовується.
-- Файли тестів (`*.test.*`, `*.spec.*`, усе в `testsRoot`) — роль `test`, правила розкладу до них не застосовуються, крім `test-mirror`.
+- Файли тестів (`*.test.*`, `*.spec.*`, усе в папці `testsLocation`, `tests/`, `test/`, `__tests__/`) — роль `test`, правила розкладу до них не застосовуються, крім `test-mirror`.
 - Файл, що відповідає glob з `entrypoints`, — роль `entrypoint`.
 - Файл поза `sourceRoot` і не з `entrypoints` (конфіги, скрипти) — роль `other`: працюють лише правила імен, параметрів, вкладеності й деструктуризації.
 
@@ -114,11 +154,11 @@ error max-params src/modules/user.ts:42 function createUser has 6 parameters (ma
 | `layout-forbidden-declaration` | У ролях `module`, `helper`, `util` немає `interface`, `type`, `enum` і константи верхнього рівня. Константа — `const`/`let`, ініціалізатор якої є даними: літерал (рядок, число, bigint, boolean, `null`, regex, шаблон без підстановок), масив чи об'єкт-літерал, що рекурсивно складається лише з таких даних, той самий вираз з `as const` або в `Object.freeze(…)`. Об'єкти з методами чи функціями-значеннями, `new …`, виклики функцій і класи — дозволені об'єкти, не константи (у `module`; у `helper`/`util` їх забороняє `helpers-only-functions`). `single-file-module` дозволено все | error |
 | `single-file-module-size` | `single-file-module` із власними константами, інтерфейсами чи типами має понад `singleFileMaxLines` непорожніх рядків — час перетворити його на папку | warning |
 | `helpers-only-functions` | У ролях `helper`, `util` на верхньому рівні лише `function`-оголошення і `const x = (…) => …` / `function`-вирази; класи й об'єкти — порушення | error |
-| `test-mirror` | Для `module`, `single-file-module`, `helper`, `util` є тест: `modular` — `<та сама папка>/<name>.test.<ext>` або `.spec.`; `layered` — `<testsRoot>/<шлях відносно sourceRoot>/<name>.test.<ext>`. Наявність файлу — все, що перевіряє хук; покриття перевіряє скіл (3.11) | error для `module`/`single-file-module`, warning для `helper`/`util` |
-| `helpers-mixed-kind` | Файл `helper` поза `helpers/infrastructure|external|logic` або файл, що водночас імпортує пакет з `infrastructurePackages` і викликає `fetch(` чи `http(s).request` | warning |
+| `test-mirror` | Для `module`, `single-file-module`, `helper`, `util` є тест `<name>.<testSuffix>.<ext>`: при `testsLocation: "colocated"` — у тій самій папці; при папці — `<testsLocation>/<шлях відносно sourceRoot>/`. Наявність файлу — все, що перевіряє хук; покриття перевіряє скіл (3.11) | error для `module`/`single-file-module`, warning для `helper`/`util` |
+| `helpers-mixed-kind` | Файл `helper` змішує категорії: водночас імпортує пакет з `infrastructurePackages` і викликає `fetch(` чи `http(s).request`, або містить і такі виклики, і функції без них. Назви підпапок не перевіряються — `infrastructure`/`external`/`logic` лише рекомендація скіла, коли проєкт не має своїх | warning |
 | `name-abbreviation` | Ім'я функції, змінної, параметра, класу, інтерфейсу, типу чи константи містить слово зі списку скорочень у `src/consts/abbreviations.ts` і не з `abbreviationAllowlist`. Слова — розбиття camelCase/PascalCase/SNAKE_CASE. Однолітерні імена — порушення, крім `_` і параметрів типу | error |
 | `name-word-count` | Ім'я має понад 3 слова; префікс сутності (`USER_`, `User`) не рахується | warning |
-| `name-entity-prefix` | У ролях `consts`, `interfaces` з сутністю `<entity>`: константи — UPPER_SNAKE і починаються з `<ENTITY>_`, інтерфейси й типи — PascalCase і починаються з `<Entity>`; сутність з дефісом чи підкресленням зводиться до відповідного регістру (`order-item` → `ORDER_ITEM_`, `OrderItem`). Глобальні константи — UPPER_SNAKE без префікса | error |
+| `name-entity-prefix` | У ролях `consts`, `interfaces` з сутністю `<entity>`: константи в регістрі `constantCase` і (при `entityPrefix: true`) з префіксом сутності: `upper-snake` → `<ENTITY>_…`, `camel` → `<entity>…`; інтерфейси й типи — PascalCase, `<interfacePrefix><Entity>…`; сутність з дефісом чи підкресленням зводиться до регістру (`order-item` → `ORDER_ITEM_`, `orderItem`, `OrderItem`). Глобальні константи — у `constantCase` без префікса. Типово (проєкт мовчить) — UPPER_SNAKE з префіксом | error |
 | `max-params` | Функція, метод чи конструктор має понад 5 параметрів | error |
 | `max-nesting` | Блоки керування (`if`, `for`, `while`, `switch`, `try`) вкладені глибше 3 рівнів у межах однієї функції, або функція-аргумент виклику вкладена в іншу функцію-аргумент глибше 2 рівнів (callback hell), або `.then(` викликано всередині колбека іншого `.then(` | error |
 | `max-call-nesting` | Виклик як аргумент виклику глибше 3 рівнів: `a(b(c(d())))` | warning |
@@ -180,7 +220,7 @@ error max-params src/modules/user.ts:42 function createUser has 6 parameters (ma
 2. Хеш — SHA-256 від відсортованого списку змінених файлів разом із вмістом кожного плюс вмісту `package.json`. Збігається з `<git-path codemaster>/last-checked` → вихід 0.
 3. `stop_hook_active` істинний → записати хеш, вихід 0.
 4. Немає залежностей ast-grep → `install` (3.10); невдача → stderr `codemaster: <причина>`, вихід 0.
-5. Запуск `check`, `tournament --candidates`, `libraries` (при `libraryDigest`). Усе чисто → записати хеш, вихід 0.
+5. Немає `.codemaster.json` → `conventions` (3.2a), профіль іде на початок звіту і сам по собі є причиною блокувати цей раз. Далі запуск `check`, `tournament --candidates`, `libraries` (при `libraryDigest`). Усе чисто → записати хеш, вихід 0.
 6. Інакше stdout `{"decision":"block","reason":"<звіт>"}`. Звіт: перший рядок `Run the codemaster skill (codemaster:codemaster) for this branch.`, далі до 30 рядків знахідок `check`, список кандидатів турніру й список `add/remove/stale` бібліотек, кожен блок з підсумковим лічильником.
 
 Будь-яка внутрішня помилка → stderr з одним рядком, вихід 0: хук ніколи не ламає сесію.
@@ -199,7 +239,7 @@ error max-params src/modules/user.ts:42 function createUser has 6 parameters (ma
 
 **Порядок роботи після хука:**
 
-1. Прочитати звіт хука.
+1. Прочитати звіт хука, а також `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING*` проєкту. Правила проєкту стоять вище за правила codemaster (розділ 2). Коли знахідка `check` суперечить правилу проєкту, Claude не виправляє її, а записує в `.codemaster.json` `rules.<id>` (`"off"` або нове значення) з `reason`, що цитує правило проєкту, і називає це у звіті. Вимоги «перейменуй папку під codemaster» не існує: розходження назв закриває `roles`.
 2. Виправити всі `error`; `warning` — виправити, коли зміна мала, інакше назвати у звіті.
 3. Для кожного кандидата турніру: написати `first`, `readable`, `optimized` і `cases` у `<scratchpad>/tournament/<functionName>/`, запустити `codemaster tournament`, перенести переможця в код, запустити тести проєкту, викликати `--done`.
 4. Бібліотеки: для `add` і `stale` написати підсумок за шаблоном, `libraries --prune --index`.
@@ -232,6 +272,7 @@ error max-params src/modules/user.ts:42 function createUser has 6 parameters (ma
 | Ваги 20 % | «обирає ту яка найкраща» | Читабельність першою — користувач обрав рівні ваги |
 | Підсумки бібліотек — проєктний скіл у git | «робив коротку сводку/скілл» | Локально чи поза репозиторієм — користувач обрав git |
 | `name-entity-prefix` — `USER_` / `User`, UPPER_SNAKE | «наслідують в назві сутность» | Суфікс замість префікса — моє рішення; camelCase — користувач обрав UPPER_SNAKE |
+| Профіль проєкту перекриває типові назви й конвенції; явні правила проєкту > домінантні конвенції > типові codemaster | «code-style проєкта важливіше за наш плагін… Дозволяється відхилення від назв» | Фіксовані назви codemaster — відкинуто користувачем |
 | Хук перевіряє змінені файли цілком, наявний код — окремий `codemaster-audit` | відповідь користувача: «скілл опрацьовує файли в кінці роботи над задачею, але є окремий скілл який робить прогон по існуючому коду» | Лише змінені рядки — відкинуто |
 | `test-mirror` — наявність файлу в хуку, 100 % рядків змінених модулів у скілі | «тести які повністю покривають модуль» | Лише наявність або покриття в хуку — користувач обрав поділ |
 | `closeness` = `bytecodePerToken` + `desugared` | «меньша відміність від того, що бачить компілятор вважається перевагою» | Одна з двох підметрик — користувач обрав обидві |
@@ -244,6 +285,9 @@ error max-params src/modules/user.ts:42 function createUser has 6 parameters (ma
 - dryer, crapper, mutator та інші інструменти ub-mode.
 - Перевірка MVC і компонентного підходу на фронтенді скриптом.
 - Завантаження сторінок документації скриптом: це робить Claude у скілі.
+- Розбір вільного тексту `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING*` скриптом: їх читає Claude у скілі.
+- Перейменування наявних папок проєкту під назви codemaster.
+- Конфіги лінтерів, крім ESLint (через `--print-config`) і Biome (`biome.json`).
 - Транзитивні залежності в дайджесті бібліотек.
 - Цикл «запускай, доки зелено»: хук блокує один раз на кожен новий стан змін.
 - Draft PR: віддаленого репозиторію немає.
@@ -268,6 +312,9 @@ error max-params src/modules/user.ts:42 function createUser has 6 parameters (ma
   - **Бібліотеки:** фальшивий `node_modules` з двома пакетами і один зайвий файл підсумку → `add` ×1, `remove` ×1, `stale` ×1; `--prune` видаляє зайвий файл і перебудовує індекс; `@types/*` і `devDependencies` пропущено (з `libraryDigestDev: true` — включено); 7 нових пакетів → 5 рядків `add` і `… and 2 more`; `libraryDigest: false` → `libraries: disabled`.
   - **Хук `Stop`:** тимчасовий git-репозиторій зі зміненим файлом-порушенням → `decision: block` з першим рядком `Run the codemaster skill`; той самий стан удруге → без виводу; зміна лише `package.json` → хук запускається; `stop_hook_active: true` → без виводу і записаний хеш; `hook: false` → без виводу; `hook: false` лише в `.codemaster.local.json` → без виводу; поза git → без виводу; завжди код 0.
   - **`check --all`:** на фікстурі бачить порушення у файлах, яких немає в diff.
+  - **Профіль проєкту:** фікстура з `src/services/`, `src/types/`, `src/constants/`, тестами `*.spec.ts` у `__tests__/` і 6 camelCase-константами з 8 → `conventions` записує `roles.module: ["services"]`, `roles.interfaces: ["types"]`, `roles.consts: ["constants"]`, `testsLocation: "__tests__"`, `testSuffix: "spec"`, `constantCase: "camel"` з `sources` `dominant …`; розклад `layered`; `interface` у `src/services/user.ts` → `layout-forbidden-declaration`, а повідомлення називає папку `types`. 3 camelCase з 5 (нижче порогу 60 %) → `constantCase: "upper-snake"`, `sources` `default`. Поле, записане користувачем без `sources`, після `--refresh` не змінилось.
+  - **ESLint проєкту:** фікстура з фальшивим `node_modules/.bin/eslint`, що друкує конфіг з `max-params: ["error", 3]` і `prefer-destructuring: "off"` → `rules.max-params.max = 3`, функція з 4 параметрами дає `max-params`, `prefer-destructuring` мовчить.
+  - **Налаштування правил:** `rules: {"max-params": "off"}` → правило мовчить; `{"name-word-count": {"max": 4}}` → ім'я з 4 слів без порушення.
   - **Хук `SessionStart`:** друкує `codemaster: layout=`.
 - `node bin/codemaster.ts check src bin` на самому плагіні: `codemaster: 0 errors`.
 - Вручну: `claude --plugin-dir .` у тестовому TS-проєкті з функцією на 6 параметрів; після відповіді, що змінила файл, хук блокує зупинку, Claude запускає скіл і виправляє сигнатуру на об'єкт, наступна зупинка проходить.
