@@ -673,10 +673,10 @@ These utils:
   - `Before a task, check whether the framework or an installed library already does it` + (`; see the codemaster-libraries skill.` when `.claude/skills/codemaster-libraries/SKILL.md` exists, else `.`);
   - `Follow the codemaster skill rules while coding.`
 
-- [ ] Step 1: unit test: a temp repo where the second identical call returns no output, using a stubbed-free real run on a one-file project.
-- [ ] Step 2: `node --test tests/modules/hook.test.ts` → fails.
-- [ ] Step 3: implement.
-- [ ] Step 4: `node --test tests/modules/hook.test.ts tests/acceptance/hook.test.ts` → `ℹ fail 0`.
+- [x] Step 1: unit test: a temp repo where the second identical call returns no output, using a stubbed-free real run on a one-file project.
+- [x] Step 2: `node --test tests/modules/hook.test.ts` → fails.
+- [x] Step 3: implement.
+- [x] Step 4: `node --test tests/modules/hook.test.ts tests/acceptance/hook.test.ts` → `ℹ fail 0`.
 
 ---
 
