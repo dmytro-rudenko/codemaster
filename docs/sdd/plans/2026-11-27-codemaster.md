@@ -65,12 +65,12 @@ Conventions for every acceptance test:
 - Each test copies the fixture it uses into `fs.mkdtempSync(join(os.tmpdir(), "codemaster-"))`. The test is never run inside the fixture itself.
 - `before()` in each file calls `runCli(["install"])` once, so ast-grep exists in the default data dir.
 
-- [ ] **Step 1: write `tests/acceptance/run-cli.ts`.** It holds three functions:
+- [x] **Step 1: write `tests/acceptance/run-cli.ts`.** It holds three functions:
   - `export function runCli(argumentsList: string[], options: { cwd?: string; input?: string; environment?: NodeJS.ProcessEnv } = {}): { status: number; stdout: string; stderr: string }` uses `spawnSync(process.execPath, [join(PLUGIN_ROOT, "bin/codemaster.ts"), ...argumentsList], { cwd, input, env: { ...process.env, ...environment }, encoding: "utf8" })`, where `PLUGIN_ROOT = resolve(import.meta.dirname, "../..")`.
   - `export function copyFixture(name: string): string` copies `tests/fixtures/<name>` into a temp dir and returns the path.
   - `export function initRepository(directory: string): void` runs `git init -q -b main`, `git -c user.email=t@t -c user.name=t commit -q --allow-empty -m base`, then `git checkout -q -b work`.
 
-- [ ] **Step 2: write the fixtures.**
+- [x] **Step 2: write the fixtures.**
   - **`tests/fixtures/modular/src/`** (layout detected as `modular`):
     - `user/user.service.ts`: line 1 `export const USER_LIMIT = 5;` → `layout-forbidden-declaration`; line 2 `export const userService = { create() { return 1; } };` → clean; line 3 `export function createUser(first: string, second: string, third: string, fourth: string, fifth: string, sixth: string) { return first; }` → `max-params`; line 4 `const cfg = 1;` → `name-abbreviation` and `layout-forbidden-declaration`.
     - `user/user.service.test.ts`: an empty test, so `test-mirror` is satisfied.
@@ -117,7 +117,7 @@ Conventions for every acceptance test:
     - `widget.tsx` holds a component with complexity ≥ 5.
     - `counter.ts` holds a class method `Counter.bump` that uses `this` and has complexity ≥ 5.
 
-- [ ] **Step 3: write the test files.**
+- [x] **Step 3: write the test files.**
   - **`check.test.ts`**:
     - `check --json src` on modular returns exactly these `{ruleId, file, line}` triples, sorted by file and then line:
       - `layout-forbidden-declaration src/user/user.service.ts:1`
@@ -180,7 +180,7 @@ Conventions for every acceptance test:
     - `README.md` exists and contains `## Install`.
   - **`end-state.test.ts`**: `git ls-files` has no `node_modules`, and `package.json` has neither `dependencies` nor `devDependencies`. `git status --porcelain` is checked only when `process.env.CODEMASTER_END_STATE === "1"`; `wolowitz` sets that in Finish, after the last commit.
 
-- [ ] **Step 4: run them, watch them fail.** `node --test "tests/acceptance/*.test.ts"` should print `ℹ fail` > 0, with failures that `bin/codemaster.ts` does not exist. This means the behaviour is missing.
+- [x] **Step 4: run them, watch them fail.** `node --test "tests/acceptance/*.test.ts"` should print `ℹ fail` > 0, with failures that `bin/codemaster.ts` does not exist. This means the behaviour is missing.
 
 ---
 
