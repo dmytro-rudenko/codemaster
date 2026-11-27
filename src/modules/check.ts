@@ -5,7 +5,7 @@ import type { CommandContext } from "../interfaces/command.ts";
 import type { ConfigProject } from "../interfaces/config.ts";
 import type { FindingItem, FindingSummary } from "../interfaces/finding.ts";
 import type { RoleLayout } from "../interfaces/role.ts";
-import { parseSource } from "../helpers/infrastructure/ast-grep.ts";
+import { loadAstGrep, parseSource } from "../helpers/infrastructure/ast-grep.ts";
 import { scanWithRules } from "../helpers/infrastructure/ast-grep-scan.ts";
 import { isRepository, listAllSourceFiles, listChangedFiles } from "../helpers/infrastructure/git.ts";
 import { checkDeclarations } from "../helpers/logic/declaration-rules.ts";
@@ -59,11 +59,11 @@ function compareFindings(left: FindingItem, right: FindingItem): number {
   return left.ruleId < right.ruleId ? -1 : left.ruleId > right.ruleId ? 1 : 0;
 }
 
-function summarize(findings: FindingItem[]): FindingSummary {
+function summarize(findings: FindingItem[], files: string[]): FindingSummary {
   return {
     errors: findings.filter((finding) => finding.severity === "error").length,
     warnings: findings.filter((finding) => finding.severity === "warning").length,
-    files: new Set(findings.map((finding) => finding.file)).size,
+    files: new Set(files).size,
   };
 }
 
@@ -76,6 +76,7 @@ export async function runChecks(input: {
   const { projectRoot, pluginRoot, config, files } = input;
   const layout = detectLayout(projectRoot, config);
   const settings = { ...config, layout };
+  await loadAstGrep();
   const results = await Promise.all(files.map((file) => checkFile({ projectRoot, file, layout, config: settings })));
   const parsedFiles = files.filter((_, position) => results[position].parsed);
   const testFiles = new Set(files.filter((_, position) => results[position].test));
@@ -84,7 +85,7 @@ export async function runChecks(input: {
   const packages = existsSync(join(projectRoot, "package.json")) ? checkSimplePackages({ projectRoot, config }) : [];
   const collected = [...results.flatMap((result) => result.findings), ...kept, ...packages];
   const findings = applySettings(collected, config).sort(compareFindings);
-  return { findings, summary: summarize(findings), layout };
+  return { findings, summary: summarize(findings, files), layout };
 }
 
 function isSourceFile(path: string): boolean {
@@ -93,7 +94,7 @@ function isSourceFile(path: string): boolean {
 
 function walkSourceFiles(projectRoot: string, target: string): string[] {
   const absolute = resolve(projectRoot, target);
-  const path = relative(projectRoot, absolute).split(sep).join("/");
+  const path = toProjectPath(projectRoot, target);
   if (!existsSync(absolute)) {
     return [];
   }
@@ -105,29 +106,49 @@ function walkSourceFiles(projectRoot: string, target: string): string[] {
     .flatMap(({ name }) => walkSourceFiles(projectRoot, path === "" ? name : `${path}/${name}`));
 }
 
-function selectFiles(projectRoot: string, argumentsList: string[]): string[] | null {
+function toProjectPath(projectRoot: string, target: string): string {
+  return relative(projectRoot, resolve(projectRoot, target)).split(sep).join("/");
+}
+
+function expandPath(projectRoot: string, target: string, tracked: string[] | null): string[] {
+  if (tracked === null) {
+    return walkSourceFiles(projectRoot, target);
+  }
+  const prefix = toProjectPath(projectRoot, target);
+  return tracked.filter((file) => prefix === "" || file === prefix || file.startsWith(`${prefix}/`));
+}
+
+function selectFiles(projectRoot: string, argumentsList: string[]): { files: string[]; missing: string | null } | null {
   const paths = argumentsList.filter((argument) => !argument.startsWith("--"));
-  if (paths.length > 0) {
-    return [...new Set(paths.flatMap((path) => walkSourceFiles(projectRoot, path)))].sort();
-  }
   const repository = isRepository(projectRoot);
-  if (argumentsList.includes("--all")) {
-    return repository ? listAllSourceFiles(projectRoot) : walkSourceFiles(projectRoot, "").sort();
+  if (paths.length > 0) {
+    const tracked = repository ? listAllSourceFiles(projectRoot) : null;
+    const expanded = paths.map((path) => ({ path, files: expandPath(projectRoot, path, tracked) }));
+    const missing = expanded.find(({ files }) => files.length === 0)?.path ?? null;
+    return { files: [...new Set(expanded.flatMap(({ files }) => files))].sort(), missing };
   }
-  return repository ? listChangedFiles(projectRoot) : null;
+  if (argumentsList.includes("--all")) {
+    return { files: repository ? listAllSourceFiles(projectRoot) : walkSourceFiles(projectRoot, "").sort(), missing: null };
+  }
+  return repository ? { files: listChangedFiles(projectRoot), missing: null } : null;
 }
 
 export async function runCommand(context: CommandContext): Promise<number> {
   const { argumentsList, projectRoot, pluginRoot, config, configWarnings } = context;
-  const lines = [...configWarnings];
-  const files = selectFiles(projectRoot, argumentsList);
-  if (files === null) {
-    lines.push("codemaster: not a git repository; pass paths");
-    process.stdout.write(`${lines.join("\n")}\n`);
-    return 0;
+  const json = argumentsList.includes("--json");
+  const lines = json ? [] : [...configWarnings];
+  if (json && configWarnings.length > 0) {
+    process.stderr.write(`${configWarnings.join("\n")}\n`);
   }
-  const { findings, summary } = await runChecks({ projectRoot, pluginRoot, config, files });
-  if (argumentsList.includes("--json")) {
+  const selection = selectFiles(projectRoot, argumentsList);
+  if (selection === null || selection.missing !== null) {
+    const status = selection === null ? 0 : 2;
+    lines.push(selection === null ? "codemaster: not a git repository; pass paths" : `codemaster: no source files match ${selection.missing}`);
+    process.stdout.write(`${lines.join("\n")}\n`);
+    return status;
+  }
+  const { findings, summary } = await runChecks({ projectRoot, pluginRoot, config, files: selection.files });
+  if (json) {
     lines.push(JSON.stringify({ findings, summary }));
   } else {
     lines.push(...findings.map(({ severity, ruleId, file, line, message }) => `${severity} ${ruleId} ${file}:${line} ${message}`));

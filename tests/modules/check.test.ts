@@ -1,5 +1,6 @@
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -55,19 +56,31 @@ function createContext(directory: string, argumentsList: string[], configWarning
   };
 }
 
-async function runCaptured(context: CommandContext): Promise<{ status: number; stdout: string }> {
+async function runCaptured(context: CommandContext): Promise<{ status: number; stdout: string; stderr: string }> {
   const writeOut = process.stdout.write;
+  const writeError = process.stderr.write;
   let stdout = "";
+  let stderr = "";
   process.stdout.write = ((chunk: string | Uint8Array) => {
     stdout += String(chunk);
     return true;
   }) as typeof process.stdout.write;
+  process.stderr.write = ((chunk: string | Uint8Array) => {
+    stderr += String(chunk);
+    return true;
+  }) as typeof process.stderr.write;
   try {
     const status = await runCommand(context);
-    return { status, stdout };
+    return { status, stdout, stderr };
   } finally {
     process.stdout.write = writeOut;
+    process.stderr.write = writeError;
   }
+}
+
+function initRepository(directory: string): void {
+  const result = spawnSync("git", ["init", "-q", "-b", "main"], { cwd: directory, encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
 }
 
 test("a rule setting replaces the severity and attaches the reason", async () => {
@@ -155,10 +168,42 @@ test("--json prints one line with findings and summary and returns 1 on errors",
 });
 
 test("--json returns 0 when there are no errors", async () => {
-  const directory = createProject({ "src/pages/button.ts": "export function renderButton(label: string) { return label; }\n" });
+  const directory = createProject({
+    "src/pages/button.ts": "export function renderButton(label: string) { return label; }\n",
+    "src/pages/title.ts": "export function renderTitle(label: string) { return label; }\n",
+  });
   const { status, stdout } = await runCaptured(createContext(directory, ["--json", "src"]));
   assert.equal(status, 0);
-  assert.deepEqual(JSON.parse(stdout.trim()), { findings: [], summary: { errors: 0, warnings: 0, files: 0 } });
+  assert.deepEqual(JSON.parse(stdout.trim()), { findings: [], summary: { errors: 0, warnings: 0, files: 2 } });
+});
+
+test("a path that matches no source file is reported and returns 2", async () => {
+  const directory = createProject({ "src/pages/home.ts": sixParameters });
+  const { status, stdout } = await runCaptured(createContext(directory, ["src/missing"]));
+  assert.equal(status, 2);
+  assert.match(stdout, /^codemaster: no source files match src\/missing$/m);
+});
+
+test("--json sends config warnings to stderr and keeps stdout parseable", async () => {
+  const directory = createProject({ "src/pages/home.ts": sixParameters, ".codemaster.json": "{ not json" });
+  const warning = "warning config .codemaster.json: invalid JSON";
+  const { status, stdout, stderr } = await runCaptured(createContext(directory, ["--json", "src"], [warning]));
+  assert.equal(status, 1);
+  const parsed = JSON.parse(stdout) as { findings: FindingItem[] };
+  assert.deepEqual(triplesOf(parsed.findings), ["max-params src/pages/home.ts:1"]);
+  assert.match(stderr, /^warning config \.codemaster\.json: invalid JSON$/m);
+});
+
+test("inside git a positional directory skips gitignored files", async () => {
+  const directory = createProject({
+    ".gitignore": "out/\n",
+    "src/pages/home.ts": sixParameters,
+    "out/build.ts": sixParameters,
+  });
+  initRepository(directory);
+  const { stdout } = await runCaptured(createContext(directory, ["--json", "."]));
+  const parsed = JSON.parse(stdout) as { findings: FindingItem[] };
+  assert.deepEqual(triplesOf(parsed.findings), ["max-params src/pages/home.ts:1"]);
 });
 
 test("plain output prints config warnings first and ends with the summary line", async () => {
