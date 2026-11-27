@@ -2,8 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { join, resolve } from "node:path";
 import { CONFIG_DEFAULTS } from "../../src/consts/config.ts";
+import { loadConfig } from "../../src/modules/config.ts";
+import { ensureInstalled } from "../../src/modules/install.ts";
 import { buildStopReason, runCommand } from "../../src/modules/hook.ts";
 import type { FindingItem } from "../../src/interfaces/finding.ts";
 
@@ -119,6 +122,94 @@ test("session start is silent when the hook is switched off", async () => {
     const { status, output } = await captureOutput(() => runCommand(context));
     assert.equal(status, 0);
     assert.equal(output, "");
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("the reason lists warnings right after the header", () => {
+  const reason = buildStopReason({
+    profile: null,
+    warnings: ["warning config .codemaster.json: invalid JSON"],
+    findings: [finding(3)],
+    summary: { errors: 1, warnings: 0, files: 1 },
+    candidates: [],
+    libraries: [],
+  });
+  assert.equal(reason.split("\n")[1], "warning config .codemaster.json: invalid JSON");
+});
+
+function createRepository(): string {
+  const projectRoot = mkdtempSync(join(tmpdir(), "codemaster-hook-"));
+  const git = (...argumentsList: string[]) =>
+    execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...argumentsList], { cwd: projectRoot, stdio: "ignore" });
+  git("init", "-q", "-b", "main");
+  git("commit", "-q", "--allow-empty", "-m", "base");
+  git("checkout", "-q", "-b", "work");
+  mkdirSync(join(projectRoot, "src/pages"), { recursive: true });
+  writeFileSync(join(projectRoot, ".codemaster.json"), "{\"libraryDigest\":false}\n");
+  writeFileSync(
+    join(projectRoot, "src/pages/home.ts"),
+    "export function sixParameters(a: number, b: number, c: number, d: number, e: number, f: number) { return a; }\n",
+  );
+  return projectRoot;
+}
+
+function stopContext(projectRoot: string, configWarnings: string[] = []) {
+  return {
+    argumentsList: ["hook-stop"],
+    projectRoot,
+    config: loadConfig(projectRoot).config,
+    configWarnings,
+    input: JSON.stringify({ cwd: projectRoot, stop_hook_active: false }),
+    pluginRoot: resolve(import.meta.dirname, "../.."),
+  };
+}
+
+test("hook-stop blocks once and stays silent on the same state", async () => {
+  ensureInstalled();
+  const projectRoot = createRepository();
+  try {
+    const first = await captureOutput(() => runCommand(stopContext(projectRoot)));
+    const { decision, reason } = JSON.parse(first.output);
+    assert.equal(decision, "block");
+    assert.ok(reason.includes("max-params src/pages/home.ts:1"), reason);
+    const second = await captureOutput(() => runCommand(stopContext(projectRoot)));
+    assert.equal(second.output, "");
+    assert.equal(second.status, 0);
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("on the first run the local config still beats the scanned profile", async () => {
+  ensureInstalled();
+  const projectRoot = createRepository();
+  try {
+    rmSync(join(projectRoot, ".codemaster.json"));
+    writeFileSync(join(projectRoot, ".codemaster.local.json"), "{\"libraryDigest\":false,\"rules\":{\"max-params\":\"off\"}}\n");
+    mkdirSync(join(projectRoot, "node_modules/.bin"), { recursive: true });
+    writeFileSync(
+      join(projectRoot, "node_modules/.bin/eslint"),
+      "#!/bin/sh\necho '{\"rules\":{\"max-params\":[\"error\",3]}}'\n",
+      { mode: 0o755 },
+    );
+    const { output } = await captureOutput(() => runCommand(stopContext(projectRoot)));
+    const { reason } = JSON.parse(output);
+    assert.ok(reason.includes("codemaster profile:"), reason);
+    assert.ok(!reason.includes("error max-params"), reason);
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("hook-stop puts config warnings into the reason", async () => {
+  ensureInstalled();
+  const projectRoot = createRepository();
+  try {
+    const context = stopContext(projectRoot, ["warning config .codemaster.local.json: invalid JSON"]);
+    const { output } = await captureOutput(() => runCommand(context));
+    assert.ok(JSON.parse(output).reason.includes("warning config .codemaster.local.json: invalid JSON"), output);
   } finally {
     rmSync(projectRoot, { recursive: true, force: true });
   }

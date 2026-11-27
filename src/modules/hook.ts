@@ -1,17 +1,16 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { CONFIG_FILE_NAME } from "../consts/config.ts";
+import { CONFIG_FILE_NAME, CONFIG_LOCAL_FILE_NAME } from "../consts/config.ts";
 import { HOOK_FINDINGS_LIMIT, HOOK_REASON_HEADER } from "../consts/hook.ts";
 import type { CommandContext } from "../interfaces/command.ts";
 import type { ConfigProject } from "../interfaces/config.ts";
 import type { FindingItem, FindingSummary } from "../interfaces/finding.ts";
 import type { HookStopInput } from "../interfaces/hook.ts";
-import { readTextFile, writeTextFile } from "../helpers/infrastructure/filesystem.ts";
+import { readJsonFile, readTextFile, writeTextFile } from "../helpers/infrastructure/filesystem.ts";
 import { isPackageManifestChanged, isRepository, listChangedFiles, resolveStateDirectory } from "../helpers/infrastructure/git.ts";
 import { detectLayout } from "../helpers/logic/file-role.ts";
 import { hashText } from "../utils/hash.ts";
 import { runChecks } from "./check.ts";
-import { loadConfig } from "./config.ts";
 import { formatProfile, scanConventions, writeProfile } from "./conventions.ts";
 import { ensureInstalled } from "./install.ts";
 import { diffLibraries, formatLibraryDiff } from "./libraries.ts";
@@ -19,13 +18,14 @@ import { findCandidates } from "./tournament.ts";
 
 export function buildStopReason(input: {
   profile: string | null;
+  warnings?: string[];
   findings: FindingItem[];
   summary: FindingSummary;
   candidates: string[];
   libraries: string[];
 }): string {
-  const { profile, findings, summary, candidates, libraries } = input;
-  const lines = [HOOK_REASON_HEADER];
+  const { profile, warnings = [], findings, summary, candidates, libraries } = input;
+  const lines = [HOOK_REASON_HEADER, ...warnings];
   if (profile) {
     lines.push(profile.trimEnd());
   }
@@ -51,24 +51,39 @@ function computeStateHash(projectRoot: string, changed: string[]): string {
   return hashText(`${parts.join("\0")}\0${readTextFile(join(projectRoot, "package.json")) ?? ""}`);
 }
 
-async function writeFirstProfile(projectRoot: string, config: ConfigProject): Promise<string> {
-  const { profile, sources } = await scanConventions(projectRoot, { config, raw: {} });
-  writeProfile(projectRoot, { ...profile, sources });
-  const written = loadConfig(projectRoot).config;
-  return formatProfile({ ...written, layout: detectLayout(projectRoot, written) }, { layout: "auto", ...sources });
+async function scanFirstProfile(projectRoot: string, current: ConfigProject): Promise<{
+  config: ConfigProject;
+  profile: string;
+  merged: Record<string, unknown>;
+  warnings: string[];
+}> {
+  const { profile, sources, warnings } = await scanConventions(projectRoot, { config: current, raw: {} });
+  const { value } = readJsonFile(join(projectRoot, CONFIG_LOCAL_FILE_NAME));
+  const localKeys = value && typeof value === "object" ? Object.keys(value) : [];
+  const local = Object.fromEntries(localKeys.filter((key) => key in current).map((key) => [key, current[key as keyof ConfigProject]]));
+  const rules = { ...profile.rules, ...current.rules };
+  const config = { ...current, ...profile, sources, ...local, rules } as ConfigProject;
+  const text = formatProfile({ ...config, layout: detectLayout(projectRoot, config) }, { layout: "auto", ...sources });
+  return { config, profile: text, merged: { ...profile, sources }, warnings };
 }
 
-async function collectReport(context: CommandContext, changed: string[]): Promise<string | null> {
-  const { projectRoot, pluginRoot } = context;
-  const profile = existsSync(join(projectRoot, CONFIG_FILE_NAME)) ? null : await writeFirstProfile(projectRoot, context.config);
-  const { config } = profile ? loadConfig(projectRoot) : context;
+async function collectReport(
+  context: CommandContext,
+  changed: string[],
+): Promise<{ reason: string | null; merged: Record<string, unknown> | null }> {
+  const { projectRoot, pluginRoot, configWarnings } = context;
+  const first = existsSync(join(projectRoot, CONFIG_FILE_NAME)) ? null : await scanFirstProfile(projectRoot, context.config);
+  const { config } = first ?? context;
+  const profile = first?.profile ?? null;
+  const warnings = [...configWarnings, ...(first?.warnings ?? [])];
   const { findings, summary } = await runChecks({ projectRoot, pluginRoot, config, files: changed });
   const candidates = (await findCandidates({ projectRoot, config })).map(
     ({ file, line, functionName, complexity, lines }) => `${file}:${line} ${functionName} complexity=${complexity} lines=${lines}`,
   );
   const libraries = config.libraryDigest ? formatLibraryDiff(diffLibraries({ projectRoot, config })) : [];
   const empty = !profile && findings.length === 0 && candidates.length === 0 && libraries.length === 0;
-  return empty ? null : buildStopReason({ profile, findings, summary, candidates, libraries });
+  const reason = empty ? null : buildStopReason({ profile, warnings, findings, summary, candidates, libraries });
+  return { reason, merged: first?.merged ?? null };
 }
 
 async function runStop(context: CommandContext): Promise<number> {
@@ -95,7 +110,10 @@ async function runStop(context: CommandContext): Promise<number> {
     process.stderr.write(`${message}\n`);
     return 0;
   }
-  const reason = await collectReport(context, changed);
+  const { reason, merged } = await collectReport(context, changed);
+  if (merged) {
+    writeProfile(projectRoot, merged);
+  }
   writeTextFile(statePath, stateHash);
   if (reason) {
     process.stdout.write(`${JSON.stringify({ decision: "block", reason })}\n`);
