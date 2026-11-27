@@ -719,7 +719,7 @@ These utils:
 **Executor:** claude
 **Complexity:** routine
 **Satisfies:** `self-check.test.ts`; the whole suite
-- [ ] Step 1: `node bin/codemaster.ts check src bin` → lists the plugin's own violations, if any.
-- [ ] Step 2: fix each violation by following the rule (move the constant into `src/consts/<entity>.ts`, rename, split the function). Never use `rules` overrides in the plugin's own `.codemaster.json`, and do not create one.
-- [ ] Step 3: `node bin/codemaster.ts check src bin` → the last line starts with `codemaster: 0 errors`.
-- [ ] Step 4: `npm test` → `ℹ fail 0`.
+- [x] Step 1: `node bin/codemaster.ts check src bin` → lists the plugin's own violations, if any.
+- [x] Step 2: fix each violation by following the rule (move the constant into `src/consts/<entity>.ts`, rename, split the function). Never use `rules` overrides in the plugin's own `.codemaster.json`, and do not create one.
+- [x] Step 3: `node bin/codemaster.ts check src bin` → the last line starts with `codemaster: 0 errors`.
+- [x] Step 4: `npm test` → `ℹ fail 0`.
