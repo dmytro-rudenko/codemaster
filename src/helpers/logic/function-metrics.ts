@@ -92,6 +92,7 @@ export function listFunctions(root: SgNode): Array<{
     "arrow_function",
     "method_definition",
     "generator_function_declaration",
+    "generator_function",
   ];
   const nodes = root.findAll({ rule: { any: kinds.map((kind) => ({ kind })) } });
   nodes.sort((left, right) => left.range().start.index - right.range().start.index);
@@ -194,7 +195,7 @@ function callDepth(call: SgNode): number {
 export function measureCallNesting(root: SgNode): Array<{ line: number; depth: number }> {
   return root
     .findAll({ rule: { kind: "call_expression" } })
-    .filter((call) => call.parent()?.kind() !== "arguments")
+    .filter((call) => call.parent()?.kind() !== "arguments" || call.parent()?.parent()?.kind() === "new_expression")
     .map((call) => ({ line: call.range().start.line + 1, depth: callDepth(call) }));
 }
 
@@ -284,21 +285,56 @@ export function countTokens(functionNode: SgNode): number {
   return children.reduce((total, child) => total + countTokens(child), 0);
 }
 
+function addPatternNames(pattern: SgNode | null, names: Set<string>): void {
+  if (pattern === null) {
+    return;
+  }
+  const kind = pattern.kind();
+  if (kind === "identifier" || kind === "shorthand_property_identifier_pattern") {
+    names.add(pattern.text());
+    return;
+  }
+  const bindingFields: Record<string, string> = {
+    pair_pattern: "value",
+    assignment_pattern: "left",
+    object_assignment_pattern: "left",
+    required_parameter: "pattern",
+    optional_parameter: "pattern",
+  };
+  const field = bindingFields[kind];
+  if (field !== undefined) {
+    addPatternNames(pattern.field(field), names);
+    return;
+  }
+  if (["rest_pattern", "object_pattern", "array_pattern", "formal_parameters"].includes(kind)) {
+    pattern.children().forEach((child) => addPatternNames(child.isNamed() ? child : null, names));
+  }
+}
+
+function declaredPattern(node: SgNode): SgNode | null {
+  const kind = node.kind();
+  if (kind === "variable_declarator") {
+    return node.field("name");
+  }
+  if (kind === "catch_clause") {
+    return node.field("parameter");
+  }
+  if (kind === "formal_parameters") {
+    return node;
+  }
+  if (kind !== "for_in_statement") {
+    return null;
+  }
+  const declaring = node.children().some((child) => ["const", "let", "var"].includes(child.kind()));
+  return declaring ? node.field("left") : null;
+}
+
 function collectDeclared(node: SgNode, names: Set<string>): void {
   for (const child of node.children()) {
     if (isFunctionKind(child)) {
       continue;
     }
-    const kind = child.kind();
-    if (kind === "identifier" || kind === "shorthand_property_identifier_pattern") {
-      const parentKind = child.parent()?.kind() ?? "";
-      if (["variable_declarator", "required_parameter", "optional_parameter", "rest_pattern"].includes(parentKind)) {
-        names.add(child.text());
-      }
-      if (kind === "shorthand_property_identifier_pattern") {
-        names.add(child.text());
-      }
-    }
+    addPatternNames(declaredPattern(child), names);
     collectDeclared(child, names);
   }
 }
@@ -325,6 +361,7 @@ export function countDesugared(functionNode: SgNode): number {
     .filter((node) => node.field("operator")?.text() === "??");
   const asyncKeyword = functionNode.children().some((child) => child.kind() === "async") ? 1 : 0;
   const declared = new Set<string>();
+  addPatternNames(functionNode.field("parameter"), declared);
   collectDeclared(functionNode, declared);
   const closures = functionNode
     .findAll({ rule: { any: ["function_expression", "arrow_function", "function_declaration"].map((kind) => ({ kind })) } })
