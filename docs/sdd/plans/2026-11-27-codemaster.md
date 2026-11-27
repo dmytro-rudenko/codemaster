@@ -466,13 +466,13 @@ These utils:
   - `max-call-nesting`: calls with depth above `max` (default 3).
 - Layout rules (`layout-forbidden-declaration`, `helpers-only-functions`, `single-file-module-size`, `helpers-mixed-kind`, `name-entity-prefix`) are skipped when the layout is `off`. Role `other` gets only the naming, `max-params`, `max-nesting` and `max-call-nesting` rules.
 
-- [ ] Step 1: tests:
+- [x] Step 1: tests:
   - each rule fires once on an inline source with the matching role and stays silent on a clean twin;
   - the `isDataInitializer` cases: `5`, `["a"] as const`, `Object.freeze({a:1})` → true; `Router()`, `new Map()`, `{ create() {} }` → false;
   - the `layout-forbidden-declaration` message contains `types` when `config.roles.interfaces = ["types"]`.
-- [ ] Step 2: `node --test tests/helpers/logic/declaration-rules.test.ts` → fails.
-- [ ] Step 3: implement.
-- [ ] Step 4: the same command → `ℹ fail 0`.
+- [x] Step 2: `node --test tests/helpers/logic/declaration-rules.test.ts` → fails.
+- [x] Step 3: implement.
+- [x] Step 4: the same command → `ℹ fail 0`.
 
 ---
 
@@ -488,10 +488,10 @@ These utils:
 - `global-assignment.yml`: `id: global-function`, `severity: error`, patterns `globalThis.$PROPERTY = $VALUE`, `window.$PROPERTY = $VALUE`, `global.$PROPERTY = $VALUE`.
 - `scanWithRules(input: { pluginRoot: string; projectRoot: string; files: string[] }): FindingItem[]`: runs `<resolveAstGrepBinary()> scan --rule <file> --json=stream <files...>` once per YAML rule, in `projectRoot`. Each JSON line maps to `{ severity, ruleId, file, line: range.start.line + 1, message }`. For `.tsx`/`.jsx` files it repeats the rule with `language: Tsx` through a temporary rule copy in `os.tmpdir()`.
 
-- [ ] Step 1: test: on a temp file `const name = user.name;\nglobalThis.run = () => 1;`, `scanWithRules` returns `prefer-destructuring` on line 1 and `global-function` on line 2.
-- [ ] Step 2: `node --test tests/helpers/infrastructure/ast-grep-scan.test.ts` → fails.
-- [ ] Step 3: implement.
-- [ ] Step 4: the same command → `ℹ fail 0`.
+- [x] Step 1: test: on a temp file `const name = user.name;\nglobalThis.run = () => 1;`, `scanWithRules` returns `prefer-destructuring` on line 1 and `global-function` on line 2.
+- [x] Step 2: `node --test tests/helpers/infrastructure/ast-grep-scan.test.ts` → fails.
+- [x] Step 3: implement.
+- [x] Step 4: the same command → `ℹ fail 0`.
 
 ---
 
@@ -511,14 +511,14 @@ These utils:
   - line 1, message `missing test <expected path>`.
 - `checkSimplePackages(input: { projectRoot: string; config: ConfigProject }): FindingItem[]`: one finding per package of `simplePackages` found in `dependencies` or `devDependencies`, with file `package.json`, line = the line of that key, and message `<name>: write simple HTTP code yourself (fetch)`.
 
-- [ ] Step 1: tests:
+- [x] Step 1: tests:
   - a temp layered project with `src/modules/user.ts` and no test → error `missing test tests/modules/user.test.ts`;
   - with `tests/modules/user.spec.ts` → none;
   - colocated with `testSuffix: "spec"` → it expects `user.spec.ts`;
   - `package.json` with `axios` on line 3 → line 3.
-- [ ] Step 2: `node --test tests/helpers/logic/project-rules.test.ts` → fails.
-- [ ] Step 3: implement.
-- [ ] Step 4: the same command → `ℹ fail 0`.
+- [x] Step 2: `node --test tests/helpers/logic/project-rules.test.ts` → fails.
+- [x] Step 3: implement.
+- [x] Step 4: the same command → `ℹ fail 0`.
 
 ---
 
@@ -644,10 +644,10 @@ These utils:
   - `--skip <key> --reason <text>` and `--done <dir>` (which reads `target.json` and the current body hash of the target function from the project file) append to `tournament-done.json` in `resolveStateDirectory`;
   - `<dir>` prints a table (`variant | passed | readability | length | bytecode | speed | bytecodePerToken | desugared | score`), then `winner: <name>`, and returns 1 for `none`.
 
-- [ ] Step 1: unit test: the scoring function `scoreVariants(metricsList, weights)` (exported from `tournament.ts`) with two variants, where one is better on everything → that one wins; with `speed: null` for both → the weights sum to 1 without speed.
-- [ ] Step 2: `node --test tests/modules/tournament.test.ts` → fails.
-- [ ] Step 3: implement.
-- [ ] Step 4: `node --test tests/modules/tournament.test.ts tests/acceptance/tournament.test.ts` → `ℹ fail 0`.
+- [x] Step 1: unit test: the scoring function `scoreVariants(metricsList, weights)` (exported from `tournament.ts`) with two variants, where one is better on everything → that one wins; with `speed: null` for both → the weights sum to 1 without speed.
+- [x] Step 2: `node --test tests/modules/tournament.test.ts` → fails.
+- [x] Step 3: implement.
+- [x] Step 4: `node --test tests/modules/tournament.test.ts tests/acceptance/tournament.test.ts` → `ℹ fail 0`.
 
 ---
 
