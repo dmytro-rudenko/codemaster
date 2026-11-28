@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# codemaster command line. Needs bash, git and the POSIX tools (awk, sed, sort, tar, curl or wget).
+# Bash 3.2 compatible, so it runs on the stock macOS bash, Linux and Git Bash on Windows.
+
+CM_SELF="${BASH_SOURCE[0]}"
+CM_ROOT=$(cd "$(dirname "$CM_SELF")/.." && pwd)
+CM_VERSION="0.2.0"
+
+. "$CM_ROOT/lib/common.sh"
+. "$CM_ROOT/lib/config.sh"
+. "$CM_ROOT/lib/git.sh"
+. "$CM_ROOT/lib/files.sh"
+. "$CM_ROOT/lib/astgrep.sh"
+. "$CM_ROOT/lib/check.sh"
+. "$CM_ROOT/lib/conventions.sh"
+. "$CM_ROOT/lib/libraries.sh"
+. "$CM_ROOT/lib/tournament.sh"
+. "$CM_ROOT/lib/hook.sh"
+
+cm_usage() {
+  cm_stderr "usage: codemaster <check|conventions|tournament|libraries|install|hook-stop|hook-session-start|version> [arguments]"
+}
+
+cm_main() {
+  local name="${1:-}" input=""
+  [ $# -gt 0 ] && shift
+  case "$name" in
+    check | conventions | tournament | libraries | install | version) ;;
+    hook-stop | hook-session-start)
+      cm_hook_entry "$name" "$@"
+      return 0
+      ;;
+    *)
+      cm_usage
+      return 2
+      ;;
+  esac
+  cm_temp_init || {
+    cm_stderr "codemaster: cannot create a temporary directory"
+    return 1
+  }
+  CM_PROJECT_ROOT=$(pwd)
+  case "$name" in
+    version)
+      printf 'codemaster %s\n' "$CM_VERSION"
+      return 0
+      ;;
+    install)
+      cm_install_command
+      return $?
+      ;;
+  esac
+  cm_config_load "$CM_PROJECT_ROOT"
+  case "$name" in
+    check) cm_check_command "$@" ;;
+    conventions) cm_conventions_command "$@" ;;
+    tournament) cm_tournament_command "$@" ;;
+    libraries) cm_libraries_command "$@" ;;
+  esac
+}
+
+cm_main "$@"
+exit $?
