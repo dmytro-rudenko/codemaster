@@ -481,7 +481,7 @@ function skipped_name(name) {
 function check_naming(    allowlist, word_limit, prefix, position, node, name, abbreviation, word_count) {
   ABBREVIATIONS = " cfg conf ctx req res msg btn tmp temp val idx err cb fn str num arr obj elem el evt e args params prev cur curr cnt len mgr svc repo impl init info ref usr pwd addr src dst desc opts env doc docs db "
   allowlist = " " cfg_joined("abbreviationAllowlist") language_allowlist()
-  word_limit = rule_limit("name-word-count", 3)
+  word_limit = rule_limit("name-word-count", 4)
   prefix = global == "1" ? "" : entity
   collect_names()
   sort_names()
@@ -516,7 +516,7 @@ function sort_names(    position, slot, current) {
 
 function check_function_rules(    parameter_limit, nesting_limit, call_limit, current, name, names, count, deep, callbacks, depth) {
   parameter_limit = rule_limit("max-params", 5)
-  nesting_limit = rule_limit("max-nesting", 3)
+  nesting_limit = rule_limit("max-nesting", 4)
   call_limit = rule_limit("max-call-nesting", 3)
   for (current = 1; current <= node_total; current++) {
     if (node_is("call", current) && is_outer_call(current)) {
