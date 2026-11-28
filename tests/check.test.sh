@@ -14,8 +14,8 @@ max-nesting src/order/order.service.ts:7
 max-params src/old/legacy.ts:1
 max-params src/user/user.service.ts:3
 name-abbreviation src/user/user.service.ts:4
-name-entity-prefix src/user/user.consts.ts:1
-name-entity-prefix src/user/user.interfaces.ts:1
+name-entity-prefix src/user/consts.ts:1
+name-entity-prefix src/user/interfaces.ts:1
 prefer-destructuring src/user/user.helpers.ts:3
 single-file-module-size src/big.ts:1
 test-mirror src/order/order.service.ts:1"

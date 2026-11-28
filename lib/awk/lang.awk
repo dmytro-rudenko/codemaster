@@ -28,6 +28,12 @@ function lang_tables(    script) {
   load_table(extension_language, "ts:typescript mts:typescript cts:typescript tsx:tsx js:javascript mjs:javascript cjs:javascript jsx:javascript py:python go:go rs:rust java:java kt:kotlin kts:kotlin cs:csharp php:php rb:ruby c:c h:c cc:cpp cpp:cpp cxx:cpp hpp:cpp hh:cpp hxx:cpp", " ")
   script = "ts tsx mts cts js jsx mjs cjs"
   load_table(language_extension_list, "typescript:" script "|tsx:" script "|javascript:" script "|python:py|go:go|rust:rs|java:java kt|kotlin:kt kts java|csharp:cs|php:php|ruby:rb|c:c cc cpp|cpp:cpp cc cxx c", "|")
+  load_table(style_extension, "css:1 scss:1 sass:1 less:1", " ")
+}
+
+function is_style_file(path) {
+  lang_tables()
+  return extension_of(path) in style_extension
 }
 
 # ast-grep language name of a path, or "" when codemaster does not read it.

@@ -147,6 +147,7 @@ cm_hook_stop() {
   CM_HOOK_STATE="$state/$CM_HOOK_STATE_FILE"
   cm_changed_paths > "$CM_TMP/hook.paths"
   cm_select_sources < "$CM_TMP/hook.paths" > "$CM_TMP/hook.changed"
+  cm_select_styles < "$CM_TMP/hook.paths" > "$CM_TMP/hook.styles"
   cm_awk '{ name = $0; sub(/^.*\//, "", name) } name == "package.json" && $0 !~ /(^|\/)(node_modules|\.git)\// { print }' "$CM_TMP/hook.paths" > "$CM_TMP/hook.changed.manifests"
   { printf 'package.json\n'; cat "$CM_TMP/hook.changed.manifests"; } | LC_ALL=C sort -u > "$CM_TMP/hook.manifests"
   cat "$CM_TMP/hook.changed" "$CM_TMP/hook.manifests" | LC_ALL=C sort -u | cm_current_hashes > "$CM_TMP/hook.current"
@@ -184,7 +185,7 @@ cm_hook_stop() {
     { printf 'layout\tauto\n'; cat "$CM_TMP/profile.sources"; } > "$CM_TMP/first.sources"
     profile=$(cm_format_profile "$CM_CONFIG" "$CM_TMP/first.sources" "$(cm_detect_layout)")
   fi
-  cm_run_checks "$CM_TMP/hook.files"
+  cm_run_checks "$CM_TMP/hook.files" "$CM_TMP/hook.styles"
   cm_report hook > "$CM_TMP/hook.report"
   grep -v '^@@summary' "$CM_TMP/hook.report" > "$CM_TMP/hook.findings"
   cm_find_candidates "$CM_TMP/hook.files" > "$CM_TMP/hook.candidates" 2>> "$CM_TMP/hook.warnings"
