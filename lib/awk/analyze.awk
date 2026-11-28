@@ -90,6 +90,7 @@ function run_checks(    position) {
   check_naming()
   check_function_rules()
   check_repeated_arrays()
+  check_lookup_chains()
   printf "@functions\t-\t%d\t\t\n", count_named_functions()
 }
 
@@ -684,4 +685,133 @@ function print_metrics(    current) {
     printf "%d %d %d %d\n", cognitive_score(current, 0, FUNCTION_BARE), body_lines(current), count_tokens(current), count_desugared(current)
     return
   }
+}
+
+# lookup-chain: consecutive if branches (sibling ifs or an else-if chain) that compare one name with literals
+# and only return a literal.
+function check_lookup_chains(    limit, current, kids, count, position, member, name, run_name, run_length, run_first) {
+  if ((!SCRIPT && LANGUAGE != "python") || role == "consts" || role == "interfaces" || role == "test") {
+    return
+  }
+  limit = rule_limit("lookup-chain", 3)
+  split("", lookup_visited)
+  for (current = 1; current <= node_total; current++) {
+    count = named_children(current, kids)
+    run_name = ""
+    run_length = 0
+    run_first = 0
+    for (position = 1; position <= count + 1; position++) {
+      member = position <= count ? kids[position] : 0
+      name = (member == 0 || (member in lookup_visited)) ? "" : lookup_name(member)
+      if (name != "" && name == run_name) {
+        run_length += chain_links(member, name)
+        continue
+      }
+      report_lookup_run(run_first, run_name, run_length, limit)
+      run_name = name
+      run_first = member
+      run_length = name == "" ? 0 : chain_links(member, name)
+    }
+  }
+}
+
+function report_lookup_run(first, name, length_of_run, limit) {
+  if (name != "" && length_of_run > limit) {
+    finding("warning", "lookup-chain", line_of(first), length_of_run " if branches compare " name " with literals; use a lookup table")
+  }
+}
+
+# Counts an if and the else-if links after it that compare the same name; marks the links as visited.
+function chain_links(node, name,    total, current, alternative, inner, count) {
+  total = 1
+  current = node
+  while (1) {
+    alternative = child_by_field(current, "alternative")
+    if (alternative == 0 || node_kind[alternative] != "else_clause") {
+      break
+    }
+    count = named_children(alternative, inner)
+    if (count != 1 || lookup_name(inner[1]) != name) {
+      break
+    }
+    lookup_visited[inner[1]] = 1
+    total++
+    current = inner[1]
+  }
+  return total
+}
+
+# The name an if compares with literals when its body only returns a literal; "" otherwise.
+function lookup_name(node,    body, statements, values, statement) {
+  if (node_kind[node] != "if_statement") {
+    return ""
+  }
+  body = child_by_field(node, "consequence")
+  if (body == 0) {
+    return ""
+  }
+  statement = body
+  if (node_kind[body] == "statement_block" || node_kind[body] == "block") {
+    if (named_children(body, statements) != 1) {
+      return ""
+    }
+    statement = statements[1]
+  }
+  if (node_kind[statement] != "return_statement" || named_children(statement, values) != 1 || !node_is("literal", values[1])) {
+    return ""
+  }
+  return compared_name(child_by_field(node, "condition"))
+}
+
+function compared_name(condition,    kind, operator, left, right, sides) {
+  condition = unwrap_parentheses(condition)
+  kind = node_kind[condition]
+  operator = operator_text(condition)
+  if ((kind == "binary_expression" && operator == "||") || (kind == "boolean_operator" && operator == "or")) {
+    left = compared_name(child_by_field(condition, "left"))
+    right = compared_name(child_by_field(condition, "right"))
+    return left != "" && left == right ? left : ""
+  }
+  if (kind == "binary_expression" && (operator == "===" || operator == "==")) {
+    return name_against_literal(child_by_field(condition, "left"), child_by_field(condition, "right"))
+  }
+  if (kind == "comparison_operator" && operator == "==" && named_children(condition, sides) == 2) {
+    return name_against_literal(sides[1], sides[2])
+  }
+  return ""
+}
+
+function name_against_literal(first, second) {
+  if (node_is("identifier", first) && node_is("literal", second)) {
+    return node_text(first)
+  }
+  if (node_is("identifier", second) && node_is("literal", first)) {
+    return node_text(second)
+  }
+  return ""
+}
+
+function unwrap_parentheses(node,    inner) {
+  while (node != 0 && node_kind[node] == "parenthesized_expression" && named_children(node, inner) == 1) {
+    node = inner[1]
+  }
+  return node
+}
+
+# The operator token of an expression: its "operator" field, else its first unnamed child.
+function operator_text(node,    found, position, member) {
+  if (node == 0) {
+    return ""
+  }
+  found = child_by_field(node, "operator")
+  if (found != 0) {
+    return node_text(found)
+  }
+  for (position = 1; position <= kid_count[node]; position++) {
+    member = kid[node, position]
+    if (!node_named[member]) {
+      return node_text(member)
+    }
+  }
+  return ""
 }
