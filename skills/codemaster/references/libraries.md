@@ -1,10 +1,10 @@
 # Library digest
 
-The digest is a project skill kept in git: one short summary per dependency, so that later sessions know what an installed library already does before they write the same thing.
+The digest is a project skill kept in git: one short summary per npm dependency (other package managers are not read yet), so that later sessions know what an installed library already does before they write the same thing.
 
 ## Commands
 
-`node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" libraries` reads `dependencies` of every `package.json` in the project and its subfolders (and `devDependencies` when `libraryDigestDev` is `true`), without `@types/*`. It skips `node_modules`, `.git`, folders that are their own git repository (worktrees, submodules) and paths matching `exclude`. A package is looked up in the `node_modules` of its manifest's folder, then of each parent folder up to the project root. The names are compared with `.claude/skills/codemaster-libraries/<name>.md`. A scoped name `@a/b` is stored as `a__b.md`. At most `libraryDigestPerRun` (default 5) `add` and `stale` lines are printed, in alphabetical order, with a final `... and <N> more` line; the rest come on the next runs.
+`bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" libraries` reads `dependencies` of every `package.json` in the project and its subfolders (and `devDependencies` when `libraryDigestDev` is `true`), without `@types/*`. It skips `node_modules`, `.git`, folders that are their own git repository (worktrees, submodules) and paths matching `exclude`. A package is looked up in the `node_modules` of its manifest's folder, then of each parent folder up to the project root. The names are compared with `.claude/skills/codemaster-libraries/<name>.md`. A scoped name `@a/b` is stored as `a__b.md`. At most `libraryDigestPerRun` (default 5) `add` and `stale` lines are printed, in alphabetical order, with a final `... and <N> more` line; the rest come on the next runs.
 
 | Line | Meaning | What to do |
 |---|---|---|
@@ -15,7 +15,7 @@ The digest is a project skill kept in git: one short summary per dependency, so 
 
 When `libraryDigest` is `false` the command prints `libraries: disabled` and does nothing.
 
-After writing the files run `node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" libraries --prune --index`. It deletes the files of removed packages and rebuilds `.claude/skills/codemaster-libraries/SKILL.md`: the frontmatter (`name: codemaster-libraries`, `description`) and one line per library with one sentence from its file.
+After writing the files run `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" libraries --prune --index`. It deletes the files of removed packages and rebuilds `.claude/skills/codemaster-libraries/SKILL.md`: the frontmatter (`name: codemaster-libraries`, `description`) and one line per library with one sentence from its file.
 
 ## Sources
 

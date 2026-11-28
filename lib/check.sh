@@ -222,6 +222,7 @@ cm_expand_paths() {
     cm_tracked_paths | cm_select_sources > "$tracked"
   fi
   CM_MISSING_PATH=""
+  : > "$CM_TMP/expanded.all"
   for target in "$@"; do
     prefix=$(printf '%s' "$target" | sed -e 's#\\#/#g' -e 's#^\./##' -e 's#/*$##')
     [ "$prefix" = "." ] && prefix=""
@@ -233,8 +234,9 @@ cm_expand_paths() {
     if [ ! -s "$CM_TMP/expanded" ] && [ -z "$CM_MISSING_PATH" ]; then
       CM_MISSING_PATH="$target"
     fi
-    cat "$CM_TMP/expanded"
-  done | LC_ALL=C sort -u
+    cat "$CM_TMP/expanded" >> "$CM_TMP/expanded.all"
+  done
+  LC_ALL=C sort -u "$CM_TMP/expanded.all"
 }
 
 cm_check_command() {

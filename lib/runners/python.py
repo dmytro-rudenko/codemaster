@@ -46,7 +46,8 @@ def main():
         parsed = json.load(handle)
     cases = parsed if isinstance(parsed, list) else parsed["cases"]
     if mode == "bytecode":
-        report("bytecode", len(list(dis.get_instructions(function))))
+        instructions = list(dis.get_instructions(function))
+        report("bytecode", len(instructions))
         return
     if mode == "verify":
         for position, case in enumerate(cases):

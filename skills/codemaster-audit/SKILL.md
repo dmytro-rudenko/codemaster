@@ -1,6 +1,6 @@
 ---
 name: codemaster-audit
-version: 0.1.0
+version: 0.2.0
 description: Use when the user asks to audit or clean up existing code with codemaster. Runs check --all, fixes errors one entity per batch with a commit each, and stops when the user says so.
 disable-model-invocation: true
 ---
@@ -9,11 +9,11 @@ disable-model-invocation: true
 
 Run over the existing code, not over the changes of the branch. The user starts it with `/codemaster:codemaster-audit [path]`; the hook never calls it.
 
-Follow the `codemaster` skill (`codemaster:codemaster`) for the priority order (project rules, then dominant conventions, then codemaster defaults), for the rules while coding, and for the `rules.<id>` + `reason` escape when a finding contradicts a project rule. Every command is `node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" <subcommand>`, run from the project root.
+Follow the `codemaster` skill (`codemaster:codemaster`) for the priority order (project rules, then dominant conventions, then codemaster defaults), for the rules while coding, and for the `rules.<id>` + `reason` escape when a finding contradicts a project rule. Every command is `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" <subcommand>`, run from the project root.
 
 ## Steps
 
-1. Run `node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" check --all`, or `node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" check <path>` when the user gave a path. Give the user a summary: the number of findings per rule-id and per entity folder.
+1. Run `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" check --all`, or `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" check <path>` when the user gave a path. Give the user a summary: the number of findings per rule-id and per entity folder.
 2. Work in batches. One batch is one entity folder in a `modular` project, or one entity across all layers (`modules`, `consts`, `interfaces`, ...) in a `layered` project. In a batch:
    1. fix the `error` findings, in the same way as steps 1 and 2 of the `codemaster` skill (fix `warning` findings only when the change is small);
    2. run the project's tests and keep them green;

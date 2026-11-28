@@ -3,6 +3,7 @@
 # Bash 3.2 compatible, so it runs on the stock macOS bash, Linux and Git Bash on Windows.
 
 CM_SELF="${BASH_SOURCE[0]}"
+CM_SELF="${CM_SELF//\\//}"
 CM_ROOT=$(cd "$(dirname "$CM_SELF")/.." && pwd)
 CM_VERSION="0.2.0"
 

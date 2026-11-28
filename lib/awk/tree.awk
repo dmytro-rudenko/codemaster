@@ -207,7 +207,7 @@ function is_inside(node, ancestor) {
 
 function has_error() {
   for (error_node = 1; error_node <= node_total; error_node++) {
-    if (node_kind[error_node] == "ERROR") {
+    if (node_kind[error_node] == "ERROR" || node_kind[error_node] ~ /^MISSING( |$)/) {
       return 1
     }
   }

@@ -260,7 +260,7 @@ function fold_go(text) {
 
 function entity_prefix_problem(name, kind, entity_name,    shape, lead, separator, expected, body, compared) {
   shape = kind == "type" ? "pascal" : cfg_get("constantCase")
-  if (LANGUAGE == "go" && shape == "camel") {
+  if (kind == "constant" && (LANGUAGE == "go" || LANGUAGE == "csharp")) {
     shape = "pascal"
   }
   lead = kind == "type" ? cfg_get("interfacePrefix") : ""

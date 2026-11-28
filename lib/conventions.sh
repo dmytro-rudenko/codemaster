@@ -111,22 +111,20 @@ cm_scan_declarations() {
   done < "$CM_TMP/scan.roles"
   CM_CONFIG="$CM_SAVED_CONFIG"
   CM_LAYOUT=""
-  cm_awk -F '\t' '$2 != "test" && $2 != "other" && $2 != "consts" && $2 != "interfaces" { print $1 }' "$CM_TMP/scan.roles" |
-    while IFS= read -r path; do
-      cm_awk '
-        /^[ \t]*(export[ \t]+)?(public[ \t]+|internal[ \t]+|private[ \t]+)*interface[ \t]+[A-Za-z_]/ {
-          line = $0
-          sub(/^.*interface[ \t]+/, "", line)
-          sub(/[^A-Za-z0-9_].*$/, "", line)
-          print "other\t\tinterface\t" line "\t-"
-        }
-        /^[ \t]*type[ \t]+[A-Za-z_][A-Za-z0-9_]*[ \t]+interface/ {
-          line = $0
-          sub(/^[ \t]*type[ \t]+/, "", line)
-          sub(/[^A-Za-z0-9_].*$/, "", line)
-          print "other\t\tinterface\t" line "\t-"
-        }' "$CM_PROJECT_ROOT/$path" 2>/dev/null
-    done >> "$CM_TMP/declarations"
+  cm_awk -F '\t' -v root="$CM_PROJECT_ROOT" '$2 != "test" && $2 != "other" && $2 != "consts" && $2 != "interfaces" { print root "/" $1 }' "$CM_TMP/scan.roles" |
+    tr '\n' '\0' | xargs -0 env LC_ALL=C awk '
+      /^[ \t]*(export[ \t]+)?(public[ \t]+|internal[ \t]+|private[ \t]+)*interface[ \t]+[A-Za-z_]/ {
+        line = $0
+        sub(/^.*interface[ \t]+/, "", line)
+        sub(/[^A-Za-z0-9_].*$/, "", line)
+        print "other\t\tinterface\t" line "\t-"
+      }
+      /^[ \t]*type[ \t]+[A-Za-z_][A-Za-z0-9_]*[ \t]+interface/ {
+        line = $0
+        sub(/^[ \t]*type[ \t]+/, "", line)
+        sub(/[^A-Za-z0-9_].*$/, "", line)
+        print "other\t\tinterface\t" line "\t-"
+      }' /dev/null 2>/dev/null >> "$CM_TMP/declarations"
   cm_awk -F '\t' '
     function case_of(name) {
       if (name ~ /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/) return "upper-snake"
