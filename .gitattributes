@@ -1,5 +1,5 @@
 # bash and awk read these files; CRLF line endings (core.autocrlf on Windows) would break them.
-bin/codemaster text eol=lf
+bin/codemaster.sh text eol=lf
 *.sh text eol=lf
 *.awk text eol=lf
 *.json text eol=lf

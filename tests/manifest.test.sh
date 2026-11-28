@@ -9,26 +9,29 @@ json_value() {
 }
 
 test_plugin_manifest() {
-  assert_equal "codemaster" "$(json_value .claude-plugin/plugin.json name)"
-  assert_equal "0.2.1" "$(json_value .claude-plugin/plugin.json version)"
-  assert_equal "./hooks/hooks.json" "$(json_value .claude-plugin/plugin.json hooks)"
-  assert_equal "0.2.1" "$(json_value .claude-plugin/marketplace.json plugins/0/version)"
+  assert_equal "code-organizer" "$(json_value .claude-plugin/plugin.json name)"
+  assert_equal "0.3.0" "$(json_value .claude-plugin/plugin.json version)"
+  assert_equal "" "$(json_value .claude-plugin/plugin.json hooks)"
+  assert_equal "code-organizer" "$(json_value .claude-plugin/marketplace.json plugins/0/name)"
+  assert_equal "0.3.0" "$(json_value .claude-plugin/marketplace.json plugins/0/version)"
 }
 
 test_hooks_run_the_bash_cli() {
   local stop session
   stop=$(json_value hooks/hooks.json hooks/Stop/0/hooks/0/command)
   session=$(json_value hooks/hooks.json hooks/SessionStart/0/hooks/0/command)
-  assert_contains "$stop" 'bash \"${CLAUDE_PLUGIN_ROOT}/bin/codemaster\" hook-stop'
-  assert_contains "$session" 'hook-session-start'
+  assert_equal '"${CLAUDE_PLUGIN_ROOT}/hooks/stop.sh"' "$(printf '%s' "$stop" | sed 's/\\"/"/g')"
+  assert_equal '"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh"' "$(printf '%s' "$session" | sed 's/\\"/"/g')"
+  assert_contains "$(cat "$PLUGIN_ROOT/hooks/stop.sh")" 'bin/codemaster.sh" hook-stop'
+  assert_contains "$(cat "$PLUGIN_ROOT/hooks/session-start.sh")" 'bin/codemaster.sh" hook-session-start'
   assert_not_contains "$stop$session" "node"
 }
 
 test_skills_carry_their_names_and_versions() {
   assert_match '^name: codemaster$' "$(frontmatter skills/codemaster/SKILL.md)"
-  assert_match '^version: 0\.2\.1$' "$(frontmatter skills/codemaster/SKILL.md)"
+  assert_match '^version: 0\.3\.0$' "$(frontmatter skills/codemaster/SKILL.md)"
   assert_match '^name: codemaster-audit$' "$(frontmatter skills/codemaster-audit/SKILL.md)"
-  assert_match '^version: 0\.2\.1$' "$(frontmatter skills/codemaster-audit/SKILL.md)"
+  assert_match '^version: 0\.3\.0$' "$(frontmatter skills/codemaster-audit/SKILL.md)"
 }
 
 test_readme_in_english_with_an_install_section() {

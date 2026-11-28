@@ -1,6 +1,6 @@
 # codemaster rules
 
-Run `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" check [paths...] [--json]`. Without paths it checks the files changed on the branch (committed, uncommitted and new), whole files at a time; `--all` checks every code file. Each finding is one line:
+Run `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.sh" check [paths...] [--json]`. Without paths it checks the files changed on the branch (committed, uncommitted and new), whole files at a time; `--all` checks every code file. Each finding is one line:
 
 ```
 error max-params src/modules/user.ts:42 function createUser has 6 parameters (max 5)
@@ -146,7 +146,7 @@ A role with no alias found as a folder gets the full list. Add your own names, f
 
 ### The project profile
 
-`bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" conventions [--refresh]` scans the project and writes the profile into `.codemaster.json`. It runs by itself on the first hook run when the file is missing, but that run never executes the project's ESLint; ESLint limits are imported only by an explicit `conventions --refresh`. Every written field gets a source in `sources`: a config path (`eslint.config.js`), `dominant 83% (41/49)` or `default`.
+`bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.sh" conventions [--refresh]` scans the project and writes the profile into `.codemaster.json`. It runs by itself on the first hook run when the file is missing, but that run never executes the project's ESLint; ESLint limits are imported only by an explicit `conventions --refresh`. Every written field gets a source in `sources`: a config path (`eslint.config.js`), `dominant 83% (41/49)` or `default`.
 
 - `sourceRoot`: the first of `src`, `app`, `server`, `lib` that exists. Otherwise, in a monorepo, one root per top-level folder with a `package.json` (its `src`, `app`, `server` or `lib` when present, else the folder itself), with the source `packages: <names>`. Otherwise `.`.
 - `roles`: the aliases that exist as folders in `sourceRoot` or in entity folders.

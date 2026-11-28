@@ -2,13 +2,13 @@
 
 test_shell_code_avoids_bash_4_features() {
   local found
-  found=$(cd "$PLUGIN_ROOT" && grep -n -E 'declare -A|local -A|mapfile|readarray|\$\{[A-Za-z_]+(,,|\^\^)\}|&>>|\|&|coproc|local -n|\[\[ -v ' bin/codemaster lib/*.sh tests/*.sh | grep -v -E 'grep -n -E|^[^:]+:[0-9]+: *#')
+  found=$(cd "$PLUGIN_ROOT" && grep -n -E 'declare -A|local -A|mapfile|readarray|\$\{[A-Za-z_]+(,,|\^\^)\}|&>>|\|&|coproc|local -n|\[\[ -v ' bin/codemaster.sh lib/*.sh tests/*.sh | grep -v -E 'grep -n -E|^[^:]+:[0-9]+: *#')
   assert_equal "" "$found"
 }
 
 test_shell_code_has_valid_syntax() {
   local file
-  for file in "$PLUGIN_ROOT"/bin/codemaster "$PLUGIN_ROOT"/lib/*.sh "$PLUGIN_ROOT"/tests/*.sh; do
+  for file in "$PLUGIN_ROOT"/bin/codemaster.sh "$PLUGIN_ROOT"/lib/*.sh "$PLUGIN_ROOT"/tests/*.sh; do
     bash -n "$file" || fail "syntax error in $file"
   done
 }

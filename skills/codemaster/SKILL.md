@@ -1,6 +1,6 @@
 ---
 name: codemaster
-version: 0.2.1
+version: 0.3.0
 description: Use while writing or changing code in this project and whenever the codemaster Stop hook asks for it. Applies the code-organisation rules (layout, names, parameters, nesting, destructuring, KISS) after the project's own conventions, runs the codemaster checks, the function tournament, coverage and the library digest, and fixes what they find.
 ---
 
@@ -8,7 +8,7 @@ description: Use while writing or changing code in this project and whenever the
 
 codemaster keeps code organised in TypeScript, JavaScript, Python, Go, Rust, Java, Kotlin, C#, PHP, Ruby, C and C++. A Stop hook runs deterministic checks after each answer. This skill is the working procedure for writing code under those rules and for fixing what the hook reports.
 
-Every command below is `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" <subcommand>`, run from the project root.
+Every command below is `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.sh" <subcommand>`, run from the project root.
 
 ## Priority
 
@@ -37,29 +37,29 @@ The checked rules (layout, naming, parameters, nesting, tests, packages) are lis
 
 ## After the Stop hook
 
-The hook blocks with a report that starts with `Run the codemaster skill (codemaster:codemaster) for this branch.` Work through these steps in order.
+The hook blocks with a report that starts with `Run the codemaster skill (code-organizer:codemaster) for this branch.` Work through these steps in order.
 
 1. Read the report, then `CLAUDE.md`, `AGENTS.md` and `CONTRIBUTING*`.
    - Project rules outrank codemaster. When a `check` finding contradicts a project rule, do not fix it. Write `rules.<id>` into `.codemaster.json` (`"off"` or a new value, for example `{"max": 8}`) with a `reason` that quotes the project rule, and name this in the final report.
-   - When the profile printed at the top of the report disagrees with the project's rules, correct the fields in `.codemaster.json` by hand, or run `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" conventions --refresh`. Fields you wrote yourself (no entry in `sources`) are never overwritten by the scanner.
+   - When the profile printed at the top of the report disagrees with the project's rules, correct the fields in `.codemaster.json` by hand, or run `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.sh" conventions --refresh`. Fields you wrote yourself (no entry in `sources`) are never overwritten by the scanner.
    - When you create `.codemaster.local.json` for the first time, add it to the project's `.gitignore`.
 2. Fix every `error`. Fix a `warning` when the change is small; otherwise name it in the report.
 3. For each tournament candidate (`<file>:<line> <functionName> complexity=<c> lines=<l>`):
    1. Create `<scratchpad>/tournament/<functionName>/` and write `first.<ext>`, `readable.<ext>`, `optimized.<ext>` (the extension of the function's language), `cases.json` and `target.json` in it, as described in `references/tournament.md`.
-   2. Run `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" tournament <dir>`.
+   2. Run `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.sh" tournament <dir>`.
    3. Move the printed `winner: <variant>` into the code, in place of the function. `winner: none` (exit 1) means every variant failed a case: fix the cases or the variants and run again.
    4. Run the project's tests.
-   5. Run `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" tournament --done <dir>`.
-   - A function that cannot be isolated (closure over module state, path aliases) is skipped: `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" tournament --skip <file>#<name> --reason "<text>"`. Name every skipped function in the final report.
-   - List the open candidates at any time with `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" tournament --candidates`.
-4. Libraries. For every `add` and `stale` line of the report, write the library summary as described in `references/libraries.md`. Run `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" libraries` to see the full list, and `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" libraries --prune --index` after the files are written. It deletes the `remove` files and rebuilds the index.
+   5. Run `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.sh" tournament --done <dir>`.
+   - A function that cannot be isolated (closure over module state, path aliases) is skipped: `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.sh" tournament --skip <file>#<name> --reason "<text>"`. Name every skipped function in the final report.
+   - List the open candidates at any time with `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.sh" tournament --candidates`.
+4. Libraries. For every `add` and `stale` line of the report, write the library summary as described in `references/libraries.md`. Run `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.sh" libraries` to see the full list, and `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.sh" libraries --prune --index` after the files are written. It deletes the `remove` files and rebuilds the index.
 5. Coverage. Run the project's tests with coverage and bring line coverage of the changed files with the roles `module` and `single-file-module` to 100%, adding tests to their mirror test files. The command is, in this order:
    1. `coverageCommand` from `.codemaster.json` — it comes from the repository, so show the exact command to the user and run it only after they approve it in this session;
    2. the coverage command of the project's own test setup, as its manifest declares it: `npx vitest run --coverage` when `package.json` lists `vitest`, `npx jest --coverage` when it lists `jest`, `node --test --experimental-test-coverage` for other Node projects; `pytest --cov` (or `coverage run -m pytest`) for Python; `go test -cover ./...` for Go; `cargo llvm-cov` or `cargo tarpaulin` for Rust when installed; the JaCoCo task of Maven or Gradle for Java and Kotlin; `dotnet test --collect:"XPlat Code Coverage"` for C#; `phpunit --coverage-text` for PHP; SimpleCov through the test suite for Ruby; `gcov`/`llvm-cov` through the build for C and C++;
    3. when the project has no coverage tool, say so in the report instead of installing one.
 
    A line that cannot honestly be covered (a defensive branch for an impossible state) is named in the report. Do not write an empty test for it.
-6. Run `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" check` again. Tell the user about every remaining `error` and why it remains.
+6. Run `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.sh" check` again. Tell the user about every remaining `error` and why it remains.
 7. Report: what was fixed, coverage of the changed modules, tournament winners and skipped functions, which libraries were added or removed, and every `rules.<id>` you wrote with its reason.
 
 ## Configuration

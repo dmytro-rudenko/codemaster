@@ -20,7 +20,7 @@ test_a_changed_file_with_a_violation_blocks_the_stop_once() {
   printf '%s\n' "$SIX_PARAMETERS" >> "$directory/src/user/user.service.ts"
   stop_hook "$directory"
   assert_equal 0 "$STATUS"
-  assert_match '^\{"decision":"block","reason":"Run the codemaster skill \(codemaster:codemaster\) for this branch\.' "$OUTPUT"
+  assert_match '^\{"decision":"block","reason":"Run the codemaster skill \(code-organizer:codemaster\) for this branch\.' "$OUTPUT"
   reason=$(hook_reason "$OUTPUT")
   assert_match 'max-params src/user/user\.service\.ts:5' "$reason"
   stop_hook "$directory"

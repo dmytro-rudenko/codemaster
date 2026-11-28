@@ -1,7 +1,7 @@
 # Test helpers, sourced by tests/run.sh. Bash 3.2 compatible.
 
 PLUGIN_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-CODEMASTER="$PLUGIN_ROOT/bin/codemaster"
+CODEMASTER="$PLUGIN_ROOT/bin/codemaster.sh"
 
 fail() {
   printf '    %s\n' "$*" >&2

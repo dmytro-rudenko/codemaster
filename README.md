@@ -12,7 +12,7 @@ From GitHub:
 
 ```
 /plugin marketplace add dmytro-rudenko/codemaster
-/plugin install codemaster@codemaster
+/plugin install code-organizer@codemaster
 ```
 
 From a local clone, either add the folder as a marketplace (`/plugin marketplace add <path>`) or load it for one session:
@@ -47,7 +47,7 @@ claude --plugin-dir <path>
 - **Function tournament.** For a changed function that is complex enough, Claude writes three variants (`first`, `readable`, `optimized`) and test cases. The runner of the language (Node for TypeScript and JavaScript, Python, Ruby, PHP, Go) drops the variants that fail a case and scores the rest by cognitive complexity, length, bytecode (V8, CPython or YARV), speed and closeness to what the runtime executes. The winner goes into the code.
 - **Library digest.** For each npm dependency Claude writes a short summary into `.claude/skills/codemaster-libraries/`, so that later sessions check what an installed library already does before writing the same code.
 - **Coverage.** The `codemaster` skill brings line coverage of the changed modules to 100%.
-- **Audit.** `/codemaster:codemaster-audit [path]` runs the checks over the existing code and fixes it one entity per batch, with a commit for each.
+- **Audit.** `/code-organizer:codemaster-audit [path]` runs the checks over the existing code and fixes it one entity per batch, with a commit for each.
 
 ### Languages
 
@@ -89,7 +89,7 @@ Every field, the defaults, the layout detection and examples for each rule are i
 
 ## Commands
 
-The hooks and skills call the CLI; you can call it too: `bash <plugin>/bin/codemaster <command>`.
+The hooks and skills call the CLI; you can call it too: `bash <plugin>/bin/codemaster.sh <command>`.
 
 | Command | Does |
 |---|---|
@@ -106,8 +106,8 @@ The hooks and skills call the CLI; you can call it too: `bash <plugin>/bin/codem
 
 Skills:
 
-- `codemaster:codemaster` is invoked by the hook and while you write code.
-- `codemaster:codemaster-audit` is started by you with `/codemaster:codemaster-audit [path]`.
+- `code-organizer:codemaster` is invoked by the hook and while you write code.
+- `code-organizer:codemaster-audit` is started by you with `/code-organizer:codemaster-audit [path]`.
 
 ## Requirements
 

@@ -1,4 +1,4 @@
-# Shared shell helpers. Sourced by bin/codemaster. Bash 3.2 compatible: no associative arrays, no mapfile.
+# Shared shell helpers. Sourced by bin/codemaster.sh. Bash 3.2 compatible: no associative arrays, no mapfile.
 
 CM_AWK_DIR="$CM_ROOT/lib/awk"
 CM_TMP=""

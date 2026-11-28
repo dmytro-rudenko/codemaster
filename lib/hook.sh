@@ -1,6 +1,6 @@
 # Stop and SessionStart hooks. They never fail a session: problems are one stderr line and exit code 0.
 
-CM_HOOK_HEADER="Run the codemaster skill (codemaster:codemaster) for this branch."
+CM_HOOK_HEADER="Run the codemaster skill (code-organizer:codemaster) for this branch."
 CM_HOOK_FINDINGS_LIMIT=30
 CM_HOOK_CANDIDATES_LIMIT=30
 CM_HOOK_LIBRARIES_LIMIT=10

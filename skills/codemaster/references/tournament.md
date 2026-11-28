@@ -4,7 +4,7 @@ Three variants of one function compete; the winner replaces the function in the 
 
 ## Candidates
 
-`bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" tournament --candidates` lists changed functions with cognitive complexity of at least `tournament.minComplexity` (default 5) or a body of at least `tournament.minLines` (default 10) non-empty lines, that are not yet in `<git-path codemaster>/tournament-done.json`. Line format: `<file>:<line> <functionName> complexity=<c> lines=<l>`.
+`bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.sh" tournament --candidates` lists changed functions with cognitive complexity of at least `tournament.minComplexity` (default 5) or a body of at least `tournament.minLines` (default 10) non-empty lines, that are not yet in `<git-path codemaster>/tournament-done.json`. Line format: `<file>:<line> <functionName> complexity=<c> lines=<l>`.
 
 - A function is changed when its line range meets a hunk of `git diff -U0 <merge-base>`, or the file is new.
 - The name is the function name; a TypeScript or JavaScript class method is `<Class>.<method>`; an anonymous function assigned to a variable takes the variable name. Other anonymous functions are never candidates.
@@ -63,4 +63,4 @@ Example `target.json`:
 3. Scoring. For each metric `score = (min + 1) / (value + 1)`, where `min` is the smallest value among the variants. `bytecodePerToken` is compared as is, without `+1`: `score = min / value`. The `closeness` score is the mean of the scores of its measured sub-metrics. The total is the sum of `score x weight` with `tournament.weights` (default 0.2 for each of `readability`, `length`, `bytecode`, `speed`, `closeness`). A metric that is not measured drops out and its weight is shared equally among the rest. A tie goes to the earlier one in the order `readable`, `first`, `optimized`.
 4. Output. A table of variants with raw values and the total, the line `winner: <variant>`, and the file `<dir>/result.json`. When all three variants are out, the output is `winner: none` and the exit code is 1.
 
-After moving the winner into the project and getting the project's tests green, run `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" tournament --done <dir>`. It records the target (key `<file>#<functionName>` plus the git blob hash of the body) in `tournament-done.json`, so the function is not offered again until its body changes.
+After moving the winner into the project and getting the project's tests green, run `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.sh" tournament --done <dir>`. It records the target (key `<file>#<functionName>` plus the git blob hash of the body) in `tournament-done.json`, so the function is not offered again until its body changes.
