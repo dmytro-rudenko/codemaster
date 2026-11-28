@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { appendFileSync, existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { copyFixture, initRepository, runCli } from "./run-cli.ts";
+import { copyFixture, initializeRepository, runCli } from "./run-cli.ts";
 
 const sixParameters =
   "export function sixParameters(first: number, second: number, third: number, fourth: number, fifth: number, sixth: number) { return first; }\n";
@@ -22,7 +22,7 @@ function stop(directory: string, active = false, environment: NodeJS.ProcessEnv 
 
 function preparedRepository(config: object | null = { libraryDigest: false }): string {
   const directory = copyFixture("modular");
-  initRepository(directory);
+  initializeRepository(directory);
   if (config) {
     writeFileSync(join(directory, ".codemaster.json"), JSON.stringify(config));
   }

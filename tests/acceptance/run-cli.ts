@@ -55,7 +55,7 @@ export function git(directory: string, argumentsList: string[]): string {
   return result.stdout;
 }
 
-export function initRepository(directory: string, options: { commitFiles?: boolean } = {}): void {
+export function initializeRepository(directory: string, options: { commitFiles?: boolean } = {}): void {
   const { commitFiles = true } = options;
   git(directory, ["init", "-q", "-b", "main"]);
   if (commitFiles) {

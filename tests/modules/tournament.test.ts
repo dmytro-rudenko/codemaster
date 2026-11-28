@@ -7,7 +7,7 @@ import { join, resolve } from "node:path";
 import { CONFIG_DEFAULTS } from "../../src/consts/config.ts";
 import { findCandidates, runTournament, scoreVariants } from "../../src/modules/tournament.ts";
 import { ensureInstalled } from "../../src/modules/install.ts";
-import { copyFixture, initRepository, runCli, stateDirectory } from "../acceptance/run-cli.ts";
+import { copyFixture, initializeRepository, runCli, stateDirectory } from "../acceptance/run-cli.ts";
 import type { ConfigWeights } from "../../src/interfaces/config.ts";
 import type { TournamentMetrics, TournamentVariantName } from "../../src/interfaces/tournament.ts";
 
@@ -403,7 +403,7 @@ for (const [label, content] of [
 ]) {
   test(`findCandidates: a ${label} done file reads as empty`, async () => {
     const directory = copyFixture("candidates");
-    initRepository(directory, { commitFiles: false });
+    initializeRepository(directory, { commitFiles: false });
     writeFileSync(doneFilePath(directory), content);
     const candidates = await findCandidates({ projectRoot: directory, config: CONFIG_DEFAULTS });
     assert.ok(
@@ -415,7 +415,7 @@ for (const [label, content] of [
 
 test("--skip over a corrupt done file writes a valid array", () => {
   const directory = copyFixture("candidates");
-  initRepository(directory, { commitFiles: false });
+  initializeRepository(directory, { commitFiles: false });
   const donePath = doneFilePath(directory);
   writeFileSync(donePath, "{not json");
   const result = runCli(["tournament", "--skip", "src/math.ts#scoreValues", "--reason", "closure"], { cwd: directory });
@@ -428,7 +428,7 @@ test("--skip over a corrupt done file writes a valid array", () => {
 for (const skipArguments of [["--skip"], ["--skip", "src/math.ts#scoreValues"], ["--skip", "src/math.ts#scoreValues", "--reason"]]) {
   test(`${skipArguments.join(" ")} prints the skip usage, returns 2 and writes nothing`, () => {
     const directory = copyFixture("candidates");
-    initRepository(directory, { commitFiles: false });
+    initializeRepository(directory, { commitFiles: false });
     const result = runCli(["tournament", ...skipArguments], { cwd: directory });
     assert.equal(result.status, 2);
     assert.match(result.stderr, /^usage: codemaster tournament --skip <file>#<name> --reason <text>$/m);
@@ -439,7 +439,7 @@ for (const skipArguments of [["--skip"], ["--skip", "src/math.ts#scoreValues"], 
 for (const usageArguments of [[], ["--done"]]) {
   test(`tournament ${usageArguments.join(" ")} prints the general usage and returns 2`, () => {
     const directory = copyFixture("candidates");
-    initRepository(directory, { commitFiles: false });
+    initializeRepository(directory, { commitFiles: false });
     const result = runCli(["tournament", ...usageArguments], { cwd: directory });
     assert.equal(result.status, 2);
     assert.equal(
@@ -451,7 +451,7 @@ for (const usageArguments of [[], ["--done"]]) {
 
 test("tournament --candidates returns 1 with the install message when the install fails", () => {
   const directory = copyFixture("candidates");
-  initRepository(directory, { commitFiles: false });
+  initializeRepository(directory, { commitFiles: false });
   const result = runCli(["tournament", "--candidates"], {
     cwd: directory,
     environment: { CODEMASTER_DATA_DIR: join(directory, "src/math.ts", "data") },
@@ -469,7 +469,7 @@ function writeTarget(functionName: string): string {
 
 test("tournament --done records the body hash and the function leaves the candidates", () => {
   const directory = copyFixture("candidates");
-  initRepository(directory, { commitFiles: false });
+  initializeRepository(directory, { commitFiles: false });
   const result = runCli(["tournament", "--done", writeTarget("scoreValues")], { cwd: directory });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, "");
@@ -484,7 +484,7 @@ test("tournament --done records the body hash and the function leaves the candid
 
 test("tournament --done records a null body hash for a function the file no longer has", () => {
   const directory = copyFixture("candidates");
-  initRepository(directory, { commitFiles: false });
+  initializeRepository(directory, { commitFiles: false });
   const result = runCli(["tournament", "--done", writeTarget("vanished")], { cwd: directory });
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(JSON.parse(readFileSync(doneFilePath(directory), "utf8")), [
@@ -494,7 +494,7 @@ test("tournament --done records a null body hash for a function the file no long
 
 test("findCandidates keeps a done function whose body hash changed", async () => {
   const directory = copyFixture("candidates");
-  initRepository(directory, { commitFiles: false });
+  initializeRepository(directory, { commitFiles: false });
   writeFileSync(
     doneFilePath(directory),
     JSON.stringify([{ key: "src/math.ts#scoreValues", bodyHash: "stale", skipped: false, reason: null }]),
@@ -505,7 +505,7 @@ test("findCandidates keeps a done function whose body hash changed", async () =>
 
 test("findCandidates takes a function by body lines alone and drops it below both thresholds", async () => {
   const directory = copyFixture("candidates");
-  initRepository(directory, { commitFiles: false });
+  initializeRepository(directory, { commitFiles: false });
   const byLines = { ...CONFIG_DEFAULTS, tournament: { ...CONFIG_DEFAULTS.tournament, minComplexity: 99, minLines: 9 } };
   const tooShort = { ...CONFIG_DEFAULTS, tournament: { ...CONFIG_DEFAULTS.tournament, minComplexity: 99, minLines: 10 } };
   const listed = await findCandidates({ projectRoot: directory, config: byLines });
@@ -537,7 +537,7 @@ test("runTournament refuses a functionName that is not an identifier", async () 
 
 test("findCandidates looks only at the files it is given", async () => {
   const directory = copyFixture("candidates");
-  initRepository(directory, { commitFiles: false });
+  initializeRepository(directory, { commitFiles: false });
   try {
     assert.deepEqual(await findCandidates({ projectRoot: directory, config: CONFIG_DEFAULTS, files: [] }), []);
     const listed = await findCandidates({ projectRoot: directory, config: CONFIG_DEFAULTS, files: ["src/math.ts"] });
@@ -549,7 +549,7 @@ test("findCandidates looks only at the files it is given", async () => {
 
 test("findCandidates on given files keeps only functions whose lines changed since the base", async () => {
   const directory = copyFixture("candidates");
-  initRepository(directory);
+  initializeRepository(directory);
   try {
     const source = readFileSync(join(directory, "src/math.ts"), "utf8");
     const renamed = source.replace("scoreValues", "rankValues").replace("score += 1", "score += 3");

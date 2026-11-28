@@ -2,7 +2,7 @@ import { before, test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { copyFixture, initRepository, runCli, stateDirectory } from "./run-cli.ts";
+import { copyFixture, initializeRepository, runCli, stateDirectory } from "./run-cli.ts";
 
 before(() => {
   runCli(["install"]);
@@ -43,7 +43,7 @@ test("all variants wrong means no winner", () => {
 
 test("candidates are non-trivial changed functions, without tsx and this-methods", () => {
   const directory = copyFixture("candidates");
-  initRepository(directory, { commitFiles: false });
+  initializeRepository(directory, { commitFiles: false });
   const result = runCli(["tournament", "--candidates"], { cwd: directory });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /^src\/math\.ts:1 scoreValues complexity=\d+ lines=\d+$/m);
@@ -52,7 +52,7 @@ test("candidates are non-trivial changed functions, without tsx and this-methods
 
 test("skip records a function with its reason", () => {
   const directory = copyFixture("candidates");
-  initRepository(directory, { commitFiles: false });
+  initializeRepository(directory, { commitFiles: false });
   const result = runCli(["tournament", "--skip", "src/math.ts#scoreValues", "--reason", "closure"], { cwd: directory });
   assert.equal(result.status, 0, result.stderr);
   const parsed = JSON.parse(readFileSync(join(stateDirectory(directory), "tournament-done.json"), "utf8"));

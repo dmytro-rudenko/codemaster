@@ -2,7 +2,7 @@ import { before, test } from "node:test";
 import assert from "node:assert/strict";
 import { appendFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { checkJson, copyFixture, initRepository, runCli, triples } from "./run-cli.ts";
+import { checkJson, copyFixture, initializeRepository, runCli, triples } from "./run-cli.ts";
 
 before(() => {
   runCli(["install"]);
@@ -64,7 +64,7 @@ test("a project without a recognised layout gets only function rules", () => {
 
 test("check without paths covers changed files, --all covers every file", () => {
   const directory = copyFixture("modular");
-  initRepository(directory);
+  initializeRepository(directory);
   appendFileSync(join(directory, "src/user/user.service.ts"), "export const userName = 'x';\n");
   const changed = checkJson(directory, []);
   assert.ok(changed.findings.length > 0);

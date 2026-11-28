@@ -78,7 +78,7 @@ async function runCaptured(context: CommandContext): Promise<{ status: number; s
   }
 }
 
-function initRepository(directory: string): void {
+function initializeRepository(directory: string): void {
   const result = spawnSync("git", ["init", "-q", "-b", "main"], { cwd: directory, encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
 }
@@ -244,7 +244,7 @@ test("inside git a positional directory skips gitignored files", async () => {
     "src/pages/home.ts": sixParameters,
     "out/build.ts": sixParameters,
   });
-  initRepository(directory);
+  initializeRepository(directory);
   const { stdout } = await runCaptured(createContext(directory, ["--json", "."]));
   const parsed = JSON.parse(stdout) as { findings: FindingItem[] };
   assert.deepEqual(triplesOf(parsed.findings), ["max-params src/pages/home.ts:1"]);
