@@ -569,14 +569,14 @@ test_the_plugin_has_no_errors_over_all_files() {
 **Complexity:** complex
 **Satisfies:** `test_if_chains_over_literals_ask_for_a_lookup_table`
 
-- [ ] **Step 1: failing test** — `tests/lookup.test.sh`:
+- [x] **Step 1: failing test** — `tests/lookup.test.sh`:
   - a JS else-if chain of 4 → finding at the first `if`;
   - 4 ifs on two different variables → no finding;
   - 4 ifs whose body calls a function → no finding;
   - a file in `consts` role → no finding;
   - `rules.lookup-chain: "off"` → no finding.
-- [ ] **Step 2: watch it fail** — `bash tests/run.sh lookup`.
-- [ ] **Step 3: implement** in `analyze.awk`, called from `run_checks`:
+- [x] **Step 2: watch it fail** — `bash tests/run.sh lookup`.
+- [x] **Step 3: implement** in `analyze.awk`, called from `run_checks`:
   - `check_lookup_chains()`:
     - Return unless SCRIPT or python, or when `role` is `consts`, `interfaces` or `test`.
     - `limit = rule_limit("lookup-chain", 3)`.
@@ -593,4 +593,4 @@ test_the_plugin_has_no_errors_over_all_files() {
     - for a `binary_expression` (SCRIPT) whose operator kid text is `||`, or a python `boolean_operator` `or`: both sides must give the same non-empty name, and that name is returned;
     - for a SCRIPT `binary_expression` with `===`/`==`, or a python `comparison_operator` with `==`: one side `node_is("identifier")` and the other `node_is("literal")` → the identifier text;
     - otherwise `""`.
-- [ ] **Step 4: watch it pass** — `bash tests/run.sh lookup`, `bash tests/run.sh acceptance if_chains`, then the full `bash tests/run.sh` → last line `<N> passed, 0 failed, 0 skipped`.
+- [x] **Step 4: watch it pass** — `bash tests/run.sh lookup`, `bash tests/run.sh acceptance if_chains`, then the full `bash tests/run.sh` → last line `<N> passed, 0 failed, 0 skipped`.
