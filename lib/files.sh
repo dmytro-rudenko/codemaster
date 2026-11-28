@@ -76,11 +76,5 @@ cm_roles() {
 }
 
 cm_tests_location() {
-  if [ -n "$CM_CFG_TESTS_LOCATION" ]; then
-    printf '%s\n' "$CM_CFG_TESTS_LOCATION"
-  elif [ "$(cm_detect_layout)" = "layered" ]; then
-    printf 'tests\n'
-  else
-    printf 'colocated\n'
-  fi
+  printf '%s\n' "${CM_CFG_TESTS_LOCATION:-tests}"
 }

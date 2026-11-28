@@ -1,6 +1,7 @@
 # Project conventions from the file list. The first input file is the flat config, then project paths.
 # -v roots="<root>|<root>" (the effective source roots, "." for the project root)
-# Prints flat profile lines for roles, testsLocation and testSuffix, and "@source<TAB>key<TAB>text" lines.
+# Prints flat profile lines for roles, testsLocation (the dominant root test folder; tests next to the code
+# never count) and testSuffix, and "@source<TAB>key<TAB>text" lines.
 # POSIX awk, with util.awk, cfg.awk, lang.awk and roles.awk.
 
 FNR == NR {
@@ -43,8 +44,10 @@ FNR == NR {
   if (suffix == "" && !in_folder && !is_test_name(name)) {
     next
   }
-  location_total++
-  location_count[in_folder ? segments[1] : "colocated"]++
+  if (in_folder) {
+    location_total++
+    location_count[segments[1]]++
+  }
   if (suffix != "") {
     suffix_total++
     suffix_count[suffix]++
@@ -112,6 +115,6 @@ END {
   emit_role("helper", alias_helper)
   emit_role("util", alias_util)
   printf "@source\troles\t%s\n", (found_names == "" ? "default" : "found: " found_names)
-  dominant("testsLocation", location_count, location_total, "")
+  dominant("testsLocation", location_count, location_total, "tests")
   dominant("testSuffix", suffix_count, suffix_total, "test")
 }

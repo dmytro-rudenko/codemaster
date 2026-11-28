@@ -270,6 +270,10 @@ function merge_field(path, field,    base_kind, over_kind, problem, other, child
     }
     return
   }
+  if (field == "testsLocation" && over_type[path] == "s" && json_unescape(over_value[path]) == "colocated") {
+    warn(label, "\"colocated\" is not supported, using \"tests\"")
+    return
+  }
   base_kind = describe(current_type[path])
   over_kind = describe(over_type[path])
   if (base_kind != over_kind) {
