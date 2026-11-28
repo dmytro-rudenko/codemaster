@@ -75,6 +75,11 @@ cm_roles() {
   cm_files_awk -v mode=roles -v layout="$(cm_detect_layout)" "$CM_CONFIG" -
 }
 
+# The tests folder, without a leading "./" or trailing "/"; "tests" when the profile leaves it empty.
 cm_tests_location() {
-  printf '%s\n' "${CM_CFG_TESTS_LOCATION:-tests}"
+  local location="${CM_CFG_TESTS_LOCATION#./}"
+  while [ "${location%/}" != "$location" ]; do
+    location="${location%/}"
+  done
+  printf '%s\n' "${location:-tests}"
 }
