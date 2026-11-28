@@ -578,3 +578,22 @@ test("a stop checks at most 200 changed files and leaves the rest for the next s
     rmSync(projectRoot, { recursive: true, force: true });
   }
 });
+
+test("a change to a subfolder package.json alone wakes a later stop", async () => {
+  ensureInstalled();
+  const projectRoot = createRepository();
+  try {
+    writeFileSync(join(projectRoot, ".codemaster.json"), "{}\n");
+    writeFileSync(join(projectRoot, "src/pages/home.ts"), CLEAN_HOME_SOURCE);
+    assert.equal((await captureOutput(() => runCommand(stopContext(projectRoot)))).output, "");
+    mkdirSync(join(projectRoot, "front/node_modules/alpha"), { recursive: true });
+    writeFileSync(join(projectRoot, "front/package.json"), "{\"dependencies\":{\"alpha\":\"1.0.0\"}}\n");
+    writeFileSync(join(projectRoot, "front/node_modules/alpha/package.json"), "{\"version\":\"1.0.0\"}\n");
+    const { output } = await captureOutput(() => runCommand(stopContext(projectRoot)));
+    const { reason } = JSON.parse(output);
+    assert.ok(reason.split("\n").includes("add alpha 1.0.0 readme=- homepage=-"), reason);
+    assert.ok("front/package.json" in readCheckedFiles(projectRoot));
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});

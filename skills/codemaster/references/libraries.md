@@ -4,13 +4,13 @@ The digest is a project skill kept in git: one short summary per dependency, so 
 
 ## Commands
 
-`node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" libraries` reads `dependencies` of `package.json` in the project root (and `devDependencies` when `libraryDigestDev` is `true`), without `@types/*`, and compares them with `.claude/skills/codemaster-libraries/<name>.md`. A scoped name `@a/b` is stored as `a__b.md`. At most `libraryDigestPerRun` (default 5) `add` and `stale` lines are printed, in alphabetical order, with a final `... and <N> more` line; the rest come on the next runs.
+`node "${CLAUDE_PLUGIN_ROOT}/bin/codemaster.ts" libraries` reads `dependencies` of every `package.json` in the project and its subfolders (and `devDependencies` when `libraryDigestDev` is `true`), without `@types/*`. It skips `node_modules`, `.git`, folders that are their own git repository (worktrees, submodules) and paths matching `exclude`. A package is looked up in the `node_modules` of its manifest's folder, then of each parent folder up to the project root. The names are compared with `.claude/skills/codemaster-libraries/<name>.md`. A scoped name `@a/b` is stored as `a__b.md`. At most `libraryDigestPerRun` (default 5) `add` and `stale` lines are printed, in alphabetical order, with a final `... and <N> more` line; the rest come on the next runs.
 
 | Line | Meaning | What to do |
 |---|---|---|
 | `add <name> <version> readme=<path or -> homepage=<url or ->` | no summary yet | write `<name>.md` |
 | `stale <name> <old> -> <new>` | the major version changed | rewrite `<name>.md` and set the new `version` |
-| `remove <name>` | the package left `package.json` | `libraries --prune` deletes the file |
+| `remove <name>` | no `package.json` declares the package any more | `libraries --prune` deletes the file |
 | `missing <name> (not installed)` | the package is not in `node_modules` | run the project's install, or skip it |
 
 When `libraryDigest` is `false` the command prints `libraries: disabled` and does nothing.

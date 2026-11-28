@@ -11,7 +11,6 @@ name: codemaster-libraries
 description: Summaries of this project's libraries: key APIs, pitfalls and documentation links. Use before implementing something a dependency may already do.
 ---
 `;
-export const LIBRARIES_MANIFEST_FILE = "package.json";
 export const LIBRARIES_MANIFEST_MISSING = "missing";
 export const LIBRARIES_MANIFEST_INVALID = "invalid JSON";
 export const LIBRARIES_TYPES_PREFIX = "@types/";

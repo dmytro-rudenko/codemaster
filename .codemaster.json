@@ -1,0 +1,37 @@
+{
+  "sourceRoot": "src",
+  "roles": {
+    "module": [
+      "modules"
+    ],
+    "interfaces": [
+      "interfaces"
+    ],
+    "consts": [
+      "consts"
+    ],
+    "helper": [
+      "helpers"
+    ],
+    "util": [
+      "utils"
+    ]
+  },
+  "testsLocation": "tests",
+  "testSuffix": "test",
+  "constantCase": "upper-snake",
+  "interfacePrefix": "",
+  "entityPrefix": true,
+  "sources": {
+    "sourceRoot": "found: src",
+    "roles": "found: modules, interfaces, consts, helpers, utils",
+    "testsLocation": "dominant 100% (84/84)",
+    "testSuffix": "dominant 89% (39/44)",
+    "constantCase": "dominant 100% (47/47)",
+    "interfacePrefix": "dominant 100% (17/17)",
+    "entityPrefix": "dominant 100% (47/47)"
+  },
+  "exclude": [
+    "tests/fixtures/**"
+  ]
+}

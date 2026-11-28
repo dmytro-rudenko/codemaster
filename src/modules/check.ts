@@ -108,7 +108,7 @@ export async function runChecks(input: {
   const testFiles = new Set(files.filter((_, position) => results[position].test));
   const scanned = parsedFiles.length === 0 ? [] : scanWithRules({ pluginRoot, projectRoot, files: parsedFiles });
   const kept = scanned.filter((finding) => finding.ruleId !== "prefer-destructuring" || !testFiles.has(finding.file));
-  const packages = existsSync(join(projectRoot, "package.json")) ? checkSimplePackages({ projectRoot, config }) : [];
+  const packages = checkSimplePackages({ projectRoot, config });
   const collected = [...results.flatMap((result) => result.findings), ...kept, ...packages];
   const findings = applySettings(collected, config).sort(compareFindings);
   return { findings, summary: summarize(findings, files), layout };

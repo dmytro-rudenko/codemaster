@@ -166,7 +166,7 @@ error max-params src/modules/user.ts:42 function createUser has 6 parameters (ma
 | `max-call-nesting` | Виклик як аргумент виклику глибше 3 рівнів: `a(b(c(d())))` | warning |
 | `global-function` | Функція верхнього рівня у файлі з роллю поза `module`, `single-file-module`, `helper`, `util`, `test`; виняток — функція `main` у ролі `entrypoint`. Також присвоєння властивості `globalThis`, `window`, `global` і `declare global` з функцією | error |
 | `prefer-destructuring` | `const $X = $OBJ.$X` або `const $X = $OBJ["$X"]` | warning |
-| `simple-package` | `dependencies` чи `devDependencies` у `package.json` містить пакет із `simplePackages` | warning |
+| `simple-package` | `dependencies` чи `devDependencies` будь-якого `package.json` проєкту (усі підпапки, крім `node_modules`, `.git`, вкладених git-репозиторіїв і `exclude`) містить пакет із `simplePackages` | warning |
 
 Список скорочень у `src/consts/abbreviations.ts` (початковий): `cfg conf ctx req res msg btn tmp temp val idx err cb fn str num arr obj elem el evt e args params prev cur curr cnt len mgr svc repo impl init info ref usr pwd addr src dst desc opts env doc docs db`.
 
@@ -203,7 +203,7 @@ error max-params src/modules/user.ts:42 function createUser has 6 parameters (ma
 
 ### 3.6. `codemaster libraries [--prune]`
 
-- Читає `dependencies` (і `devDependencies`, коли `libraryDigestDev: true`) з `package.json` у корені проєкту, без `@types/*`. *(Моє рішення: dev-інструменти — eslint, typescript, тест-раннери — мало що кажуть про можливості проєкту, а перший запуск інакше видає десятки `add`.)* У вивід потрапляють не більше `libraryDigestPerRun` рядків `add`/`stale` (за алфавітом), останнім рядком `… and <N> more` — решта на наступних прогонах. Версію бере з `node_modules/<name>/package.json`; немає встановленого пакета — рядок `missing <name> (not installed)`.
+- Читає `dependencies` (і `devDependencies`, коли `libraryDigestDev: true`) з усіх `package.json` проєкту — у корені й підпапках, крім `node_modules`, `.git`, вкладених git-репозиторіїв (worktree, submodule) і шляхів з `exclude`, без `@types/*`. *(Моє рішення: dev-інструменти — eslint, typescript, тест-раннери — мало що кажуть про можливості проєкту, а перший запуск інакше видає десятки `add`.)* У вивід потрапляють не більше `libraryDigestPerRun` рядків `add`/`stale` (за алфавітом), останнім рядком `… and <N> more` — решта на наступних прогонах. Версію бере з `node_modules/<name>/package.json` у теці маніфесту, а далі в кожній батьківській теці до кореня; немає встановленого пакета — рядок `missing <name> (not installed)`.
 - Порівнює зі списком файлів `.claude/skills/codemaster-libraries/<name>.md` (scope `@a/b` → `a__b.md`); у frontmatter кожного файлу `name`, `version`.
 - Вивід: `add <name> <version> readme=<шлях або -> homepage=<url або ->`, `remove <name>`, `stale <name> <old> -> <new>` (змінилась мажорна версія).
 - `--prune` видаляє файли `remove` і перебудовує `.claude/skills/codemaster-libraries/SKILL.md` — індекс: frontmatter скіла (`name: codemaster-libraries`, `description`) і по рядку на бібліотеку з одним реченням з її файлу. Також перебудовує індекс після того, як Claude додав файли (`--index`).

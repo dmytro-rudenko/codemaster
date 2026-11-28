@@ -383,3 +383,13 @@ test("test-mirror: with a list of source roots the tests path is relative to the
   );
   assert.equal(findings[0].message, "missing test tests/modules/user.test.ts");
 });
+
+test("simple-package: a manifest in a subfolder is reported under its own path, node_modules is skipped", () => {
+  const manifest = ["{", '  "dependencies": {', '    "axios": "1.7.0"', "  }", "}", ""].join("\n");
+  const projectRoot = createProject({
+    "front/package.json": manifest,
+    "front/node_modules/axios/package.json": manifest,
+  });
+  const findings = checkSimplePackages({ projectRoot, config: CONFIG_DEFAULTS });
+  assert.deepEqual(findings.map(({ file, line }) => `${file}:${line}`), ["front/package.json:3"]);
+});
