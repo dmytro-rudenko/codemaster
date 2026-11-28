@@ -411,9 +411,9 @@ test_the_plugin_has_no_errors_over_all_files() {
 **Interfaces:**
 - Produces: `is_style_file(path)` in lang.awk (extension `css scss sass less`, looked up in a table); `cm_select_styles` (stdin paths → existing style files outside ignored folders and `exclude`); `CM_SELECT`, the selector `cm_all_sources`/`cm_walk_sources`/`cm_expand_paths` call (default `cm_select_sources`); `cm_run_checks <files> [styles file]`.
 
-- [ ] **Step 1: failing test** — `tests/names.test.sh`. `.scss` and `.less` with `.module` → finding; `dist/x.styles.css` → no finding; `src/global/consts.ts` → no finding.
-- [ ] **Step 2: watch it fail** — `bash tests/run.sh names`.
-- [ ] **Step 3: implement:**
+- [x] **Step 1: failing test** — `tests/names.test.sh`. `.scss` and `.less` with `.module` → finding; `dist/x.styles.css` → no finding; `src/global/consts.ts` → no finding.
+- [x] **Step 2: watch it fail** — `bash tests/run.sh names`.
+- [x] **Step 3: implement:**
   - `lang.awk`: `is_style_file(path)` reads a table built once from `split("css scss sass less", …)`. It sits next to the other tables Task 8 builds.
   - `files.awk` filter mode: move the exclude loop into `function excluded(path)`. Under `want == "styles"`, print a path when `is_style_file(path) && !in_ignored_directory(path) && !excluded(path)`, then `next`.
   - `files.sh`: add `cm_select_styles` (the same body as `cm_select_sources` with `-v want=styles`). In `cm_all_sources` and `cm_walk_sources`, replace `cm_select_sources` with `"${CM_SELECT:-cm_select_sources}"`.
@@ -459,7 +459,7 @@ test_the_plugin_has_no_errors_over_all_files() {
       `cm_check_names` is built the same way as `cm_check_placement`, with `names.awk`.
   - `hook.sh`: after `hook.changed`, add `cm_select_styles < "$CM_TMP/hook.paths" > "$CM_TMP/hook.styles"`, and change the call to `cm_run_checks "$CM_TMP/hook.files" "$CM_TMP/hook.styles"`.
   - Rename the two modular fixture files with `git mv`. In `tests/check.test.sh`, the expected lines become `name-entity-prefix src/user/consts.ts:1` and `name-entity-prefix src/user/interfaces.ts:1`. Keep the list sorted the way `triples` sorts it.
-- [ ] **Step 4: watch it pass** — `bash tests/run.sh names`, `bash tests/run.sh acceptance suffix`, `bash tests/run.sh acceptance modular_fixture`, `bash tests/run.sh check`, `bash tests/run.sh hook`, `bash tests/run.sh roles`: all ok.
+- [x] **Step 4: watch it pass** — `bash tests/run.sh names`, `bash tests/run.sh acceptance suffix`, `bash tests/run.sh acceptance modular_fixture`, `bash tests/run.sh check`, `bash tests/run.sh hook`, `bash tests/run.sh roles`: all ok.
 
 ---
 
@@ -471,14 +471,14 @@ test_the_plugin_has_no_errors_over_all_files() {
 **Complexity:** complex
 **Satisfies:** `test_repeated_array_elements_ask_for_a_loop`, `test_plain_data_arrays_stay_quiet`
 
-- [ ] **Step 1: failing test** — `tests/arrays.test.sh`:
+- [x] **Step 1: failing test** — `tests/arrays.test.sh`:
   - JS `[[0, 0], [0, 1], [1, 0], [1, 1]]` → finding with N=4;
   - `[0, 10, 20, 30, 40]` → N=5;
   - `[1, 2, 4, 8, 16]` → no finding;
   - 4 elements of the same shape followed by 1 different → N=4;
   - `rules.array-repeated-elements.max: 4` with 4 elements → no finding.
-- [ ] **Step 2: watch it fail** — `bash tests/run.sh arrays`.
-- [ ] **Step 3: implement** in `analyze.awk`, called from `run_checks` after `check_function_rules()`:
+- [x] **Step 2: watch it fail** — `bash tests/run.sh arrays`.
+- [x] **Step 3: implement** in `analyze.awk`, called from `run_checks` after `check_function_rules()`:
   - `check_repeated_arrays()`:
     - Return when `!SCRIPT && LANGUAGE != "python"` or `role` is `consts`, `interfaces` or `test`.
     - `limit = rule_limit("array-repeated-elements", 3)`.
@@ -492,7 +492,7 @@ test_the_plugin_has_no_errors_over_all_files() {
     - `node_is("literal", node)` or `node_kind[node] == "jsx_text"` → `"L"`;
     - `node_is("identifier", node)` → `node_kind[node] ":" node_text(node)`;
     - otherwise `node_kind[node] "(" <shapes of named kids joined by ","> ")"`.
-- [ ] **Step 4: watch it pass** — `bash tests/run.sh arrays`, `bash tests/run.sh acceptance array`, `bash tests/run.sh acceptance plain_data`, `bash tests/run.sh check`, and `bash tests/run.sh acceptance plugin_has_no_errors` (warnings in `lib/runners` are fine).
+- [x] **Step 4: watch it pass** — `bash tests/run.sh arrays`, `bash tests/run.sh acceptance array`, `bash tests/run.sh acceptance plain_data`, `bash tests/run.sh check`, and `bash tests/run.sh acceptance plugin_has_no_errors` (warnings in `lib/runners` are fine).
 
 ---
 
