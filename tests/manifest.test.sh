@@ -10,9 +10,9 @@ json_value() {
 
 test_plugin_manifest() {
   assert_equal "codemaster" "$(json_value .claude-plugin/plugin.json name)"
-  assert_equal "0.2.0" "$(json_value .claude-plugin/plugin.json version)"
+  assert_equal "0.2.1" "$(json_value .claude-plugin/plugin.json version)"
   assert_equal "./hooks/hooks.json" "$(json_value .claude-plugin/plugin.json hooks)"
-  assert_equal "0.2.0" "$(json_value .claude-plugin/marketplace.json plugins/0/version)"
+  assert_equal "0.2.1" "$(json_value .claude-plugin/marketplace.json plugins/0/version)"
 }
 
 test_hooks_run_the_bash_cli() {

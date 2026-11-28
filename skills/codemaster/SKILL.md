@@ -1,6 +1,6 @@
 ---
 name: codemaster
-version: 0.2.0
+version: 0.2.1
 description: Use while writing or changing code in this project and whenever the codemaster Stop hook asks for it. Applies the code-organisation rules (layout, names, parameters, nesting, destructuring, KISS) after the project's own conventions, runs the codemaster checks, the function tournament, coverage and the library digest, and fixes what they find.
 ---
 
