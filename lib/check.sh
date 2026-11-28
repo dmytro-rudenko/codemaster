@@ -72,6 +72,12 @@ cm_project_basenames() {
   fi
 }
 
+# Reads role lines on stdin; prints test-placement findings.
+cm_check_placement() {
+  cm_awk -f "$CM_AWK_DIR/util.awk" -f "$CM_AWK_DIR/cfg.awk" -f "$CM_AWK_DIR/lang.awk" -f "$CM_AWK_DIR/roles.awk" \
+    -f "$CM_AWK_DIR/placement.awk" -v location="$(cm_tests_location)" "$CM_CONFIG" -
+}
+
 # Reads role lines on stdin; prints test-mirror findings.
 cm_check_mirrors() {
   local path severity expected paths names candidate found
@@ -184,9 +190,10 @@ cm_scan_rule() {
 cm_run_checks() {
   local files="$1" path role entity global language line severity rule message reason
   cm_detect_layout > /dev/null
-  cm_roles < "$files" > "$CM_TMP/roles"
-  CM_CHECKED_COUNT=$(LC_ALL=C sort -u "$files" | grep -c .)
   : > "$CM_TMP/findings.raw"
+  cm_roles < "$files" > "$CM_TMP/roles"
+  cm_check_placement < "$CM_TMP/roles" >> "$CM_TMP/findings.raw"
+  CM_CHECKED_COUNT=$(LC_ALL=C sort -u "$files" | grep -c .)
   : > "$CM_TMP/parsed.roles"
   while IFS="$(printf '\t')" read -r path role entity global language; do
     [ -n "$path" ] || continue

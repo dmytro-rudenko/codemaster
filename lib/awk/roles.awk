@@ -73,13 +73,19 @@ function is_test_name(name) {
   return name ~ /[a-z0-9](Test|Tests|Spec|IT)\.(java|kt|kts|cs|php)$/
 }
 
-function is_test_path(path,    segments, count) {
+function is_test_folder(name) {
+  return name == "tests" || name == "test" || name == "__tests__" || name == "spec"
+}
+
+function is_test_path(path,    segments, count, position) {
   count = split(path, segments, "/")
   if (is_test_name(segments[count])) {
     return 1
   }
-  if (segments[1] == "tests" || segments[1] == "test" || segments[1] == "__tests__" || segments[1] == "spec") {
-    return 1
+  for (position = 1; position < count; position++) {
+    if (is_test_folder(segments[position])) {
+      return 1
+    }
   }
   if (path ~ /(^|\/)src\/test\//) {
     return 1
