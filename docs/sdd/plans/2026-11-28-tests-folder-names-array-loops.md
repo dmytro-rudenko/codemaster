@@ -48,7 +48,7 @@ Serialized because of shared files: `lib/awk/analyze.awk` (2 → 4 → 6 → 9),
 **Executor:** claude
 **Covers:** every bullet of spec §6 Verification, plus the lookup-chain rule and the awk refactor.
 
-- [ ] **Step 1: write the acceptance tests** — `tests/acceptance.test.sh`:
+- [x] **Step 1: write the acceptance tests** — `tests/acceptance.test.sh`:
 
 ```bash
 # Acceptance: one tests folder, tests only for functions, suffix-free names, loops and lookup tables, limits of 4.
@@ -248,7 +248,7 @@ test_the_plugin_has_no_errors_over_all_files() {
 }
 ```
 
-- [ ] **Step 2: run them, watch them fail** — `bash tests/run.sh acceptance`. Expect `FAIL` for every test except `test_go_tests_stay_next_to_the_code` and `test_the_plugin_has_no_errors_over_all_files`, and a last line `2 passed, 15 failed, 0 skipped` (± the two). Commit the file.
+- [x] **Step 2: run them, watch them fail** — `bash tests/run.sh acceptance`. Expect `FAIL` for every test except `test_go_tests_stay_next_to_the_code` and `test_the_plugin_has_no_errors_over_all_files`, and a last line `2 passed, 15 failed, 0 skipped` (± the two). Commit the file.
 
 ---
 
