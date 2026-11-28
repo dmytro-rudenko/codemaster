@@ -263,8 +263,8 @@ test_the_plugin_has_no_errors_over_all_files() {
 **Interfaces:**
 - Produces: `cm_tests_location` always prints a folder (`${CM_CFG_TESTS_LOCATION:-tests}`); `cfg_severity_default` returns `warning` for `file-name-suffix`, `array-repeated-elements`, `lookup-chain`.
 
-- [ ] **Step 1: run the two acceptance tests, watch them fail** — `bash tests/run.sh acceptance colocated`.
-- [ ] **Step 2: implement:**
+- [x] **Step 1: run the two acceptance tests, watch them fail** — `bash tests/run.sh acceptance colocated`.
+- [x] **Step 2: implement:**
   - `lib/defaults.json`: `"testsLocation": "tests"`.
   - `lib/awk/config.awk`, `merge_field`, right after the `coverageCommand` block:
     ```awk
@@ -278,7 +278,7 @@ test_the_plugin_has_no_errors_over_all_files() {
   - `lib/awk/cfg.awk` `cfg_severity_default`: add `rule == "file-name-suffix" || rule == "array-repeated-elements" || rule == "lookup-chain"` to the warning list.
   - `lib/awk/mirror.awk` `mirror_directory`: `if (language == "go" || location == "colocated")` → `if (language == "go")`.
   - Move the five modular fixture tests with `git mv` to the paths in **Writes**.
-- [ ] **Step 3: run them, watch them pass** — `bash tests/run.sh acceptance colocated` → 2 ok. Then `bash tests/run.sh check`, `bash tests/run.sh conventions`, `bash tests/run.sh hook`, `bash tests/run.sh roles`: all ok. If a test expected colocated behaviour, fix the expectation to `tests/…`.
+- [x] **Step 3: run them, watch them pass** — `bash tests/run.sh acceptance colocated` → 2 ok. Then `bash tests/run.sh check`, `bash tests/run.sh conventions`, `bash tests/run.sh hook`, `bash tests/run.sh roles`: all ok. If a test expected colocated behaviour, fix the expectation to `tests/…`.
 
 ---
 
