@@ -1,5 +1,6 @@
 # file-name-suffix. First input file: the flat config; then role lines (style files carry role "style").
 # Prints raw findings "path<TAB>1<TAB>warning<TAB>file-name-suffix<TAB>rename to <path>". POSIX awk, with util, cfg, lang, roles.
+BEGIN { FS = "\t" }
 FNR == NR { cfg_store(); next }
 !started { started = 1; roles_init() }
 {

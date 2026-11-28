@@ -62,3 +62,12 @@ test_the_rule_can_be_switched_off() {
   assert_equal 0 "$(lookup_findings)"
   assert_match '^codemaster: [0-9]+ errors, [0-9]+ warnings in 1 files$' "$OUTPUT"
 }
+
+test_a_python_elif_chain_asks_for_a_lookup_table() {
+  local directory
+  directory=$(new_project '{"layout": "modular"}')
+  put "$directory/src/size/size.py" 'def size_of(kind):\n    if kind == "s":\n        return 1\n    elif kind == "m":\n        return 2\n    elif kind == "l":\n        return 3\n    elif kind == "xl":\n        return 4\n    return 0\n'
+  run_in "$directory" check src
+  assert_match '^warning lookup-chain src/size/size\.py:2 4 if branches compare kind with literals; use a lookup table$' "$OUTPUT"
+  assert_equal 1 "$(lookup_findings)"
+}

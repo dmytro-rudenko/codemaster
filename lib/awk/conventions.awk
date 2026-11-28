@@ -36,7 +36,7 @@ FNR == NR {
   }
   count = split(path, segments, "/")
   name = segments[count]
-  in_folder = segments[1] == "tests" || segments[1] == "test" || segments[1] == "__tests__" || segments[1] == "spec"
+  in_folder = is_test_folder(segments[1])
   suffix = ""
   if (match(name, /\.(test|spec)\./)) {
     suffix = substr(name, RSTART + 1, RLENGTH - 2)

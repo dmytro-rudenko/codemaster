@@ -63,3 +63,21 @@ test_max_raises_the_limit() {
   assert_not_contains "$OUTPUT" "array-repeated-elements"
   assert_match "$SUMMARY_ONE_FILE" "$OUTPUT"
 }
+
+test_hex_numbers_do_not_make_a_progression() {
+  local directory
+  directory=$(new_project "$MODULAR")
+  put "$directory/src/grid/grid.js" 'export function masks() {\n  return [0x10, 0x20, 0x30, 0x40, 0x50];\n}\n'
+  run_in "$directory" check src
+  assert_not_contains "$OUTPUT" "array-repeated-elements"
+  assert_match "$SUMMARY_ONE_FILE" "$OUTPUT"
+}
+
+test_decimal_integers_with_a_step_of_one_ask_for_a_loop() {
+  local directory
+  directory=$(new_project "$MODULAR")
+  put "$directory/src/grid/grid.js" 'export function steps() {\n  return [1, 2, 3, 4, 5];\n}\n'
+  run_in "$directory" check src
+  assert_match '^warning array-repeated-elements src/grid/grid\.js:2 array has 5 elements of the same shape; build it with a for loop$' "$OUTPUT"
+  assert_equal 1 "$(array_findings "$OUTPUT")"
+}

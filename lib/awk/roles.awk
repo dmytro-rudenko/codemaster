@@ -91,7 +91,7 @@ function is_test_path(path,    segments, count, position) {
   if (path ~ /(^|\/)src\/test\//) {
     return 1
   }
-  return tests_location != "" && tests_location != "colocated" && (path == tests_location || substr(path, 1, length(tests_location) + 1) == tests_location "/")
+  return tests_location != "" && (path == tests_location || substr(path, 1, length(tests_location) + 1) == tests_location "/")
 }
 
 # Fills relative[1..n] with the segments below the deepest source root holding the path; returns n or 0.

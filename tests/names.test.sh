@@ -52,3 +52,12 @@ test_plain_consts_file_has_no_finding() {
   assert_not_contains "$OUTPUT" "file-name-suffix"
   assert_match '^codemaster: [0-9]+ errors, [0-9]+ warnings in 2 files$' "$OUTPUT"
 }
+
+test_a_style_file_in_a_folder_with_a_space_is_renamed_without_the_suffix() {
+  local directory
+  directory=$(new_project "$MODULAR")
+  put "$directory/src/user/service.ts" "$USER_SERVICE"
+  put "$directory/src/my button/button.styles.css" '.button { color: red; }\n'
+  run_in "$directory" check src
+  assert_match '^warning file-name-suffix src/my button/button\.styles\.css:1 rename to src/my button/button\.css$' "$OUTPUT"
+}

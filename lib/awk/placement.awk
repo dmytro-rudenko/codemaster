@@ -1,6 +1,7 @@
 # Test files outside the one tests folder. First input file: the flat config; then role lines
 # "path<TAB>role<TAB>entity<TAB>global<TAB>language". -v location=<tests folder>.
 # Prints raw findings "path<TAB>1<TAB>error<TAB>test-placement<TAB>message". POSIX awk, with util, cfg, lang, roles.
+BEGIN { FS = "\t" }
 FNR == NR { cfg_store(); next }
 !started { started = 1; roles_init() }
 $2 != "test" || $5 == "go" { next }

@@ -103,3 +103,12 @@ test_a_trailing_slash_in_tests_location_gives_single_slash_messages() {
   assert_match '^error test-placement src/user/service\.test\.ts:1 test file src/user/service\.test\.ts belongs in tests/user/service\.test\.ts$' "$OUTPUT"
   assert_match '^error test-placement src/order/__tests__/order\.test\.ts:1 second test folder src/order/__tests__; keep all tests in tests/$' "$OUTPUT"
 }
+
+test_a_test_in_a_folder_with_a_space_is_misplaced() {
+  local directory
+  directory=$(new_project "$MODULAR")
+  put "$directory/src/my mod/svc.ts" "$USER_SERVICE"
+  put "$directory/src/my mod/svc.test.ts" 'createUser();\n'
+  run_in "$directory" check src
+  assert_match '^error test-placement src/my mod/svc\.test\.ts:1 test file src/my mod/svc\.test\.ts belongs in tests/my mod/svc\.test\.ts$' "$OUTPUT"
+}

@@ -114,11 +114,9 @@ function check_repeated_arrays(    limit, current, kind, count) {
   }
 }
 
+# A plain decimal integer literal; other number forms parse differently across awks.
 function is_number_literal(node) {
-  if (SCRIPT) {
-    return node_kind[node] == "number"
-  }
-  return node_kind[node] == "integer" || node_kind[node] == "float"
+  return node_text(node) ~ /^[0-9]+$/ && (node_kind[node] == "number" || node_kind[node] == "integer")
 }
 
 function is_compound(node,    kids) {
@@ -721,9 +719,20 @@ function report_lookup_run(first, name, length_of_run, limit) {
   }
 }
 
-# Counts an if and the else-if links after it that compare the same name; marks the links as visited.
-function chain_links(node, name,    total, current, alternative, inner, count) {
+# Counts an if and the else-if or elif links after it that compare the same name; marks the links as visited.
+function chain_links(node, name,    total, current, alternative, inner, count, position) {
   total = 1
+  for (position = 1; position <= kid_count[node]; position++) {
+    alternative = kid[node, position]
+    if (node_field[alternative] != "alternative" || node_kind[alternative] != "elif_clause") {
+      continue
+    }
+    if (lookup_name(alternative) != name) {
+      return total
+    }
+    lookup_visited[alternative] = 1
+    total++
+  }
   current = node
   while (1) {
     alternative = child_by_field(current, "alternative")
@@ -743,7 +752,7 @@ function chain_links(node, name,    total, current, alternative, inner, count) {
 
 # The name an if compares with literals when its body only returns a literal; "" otherwise.
 function lookup_name(node,    body, statements, values, statement) {
-  if (node_kind[node] != "if_statement") {
+  if (node_kind[node] != "if_statement" && node_kind[node] != "elif_clause") {
     return ""
   }
   body = child_by_field(node, "consequence")

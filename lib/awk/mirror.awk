@@ -5,6 +5,8 @@
 # paths are exact candidates ("|"-separated); names are file names accepted anywhere in the project.
 # POSIX awk, with util.awk, cfg.awk and lang.awk.
 
+BEGIN { FS = "\t" }
+
 FNR == NR {
   cfg_store()
   next

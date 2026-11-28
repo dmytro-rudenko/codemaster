@@ -58,3 +58,11 @@ test_a_trailing_slash_in_the_tests_folder_is_ignored() {
   run_in "$directory" check src
   assert_match '^error test-mirror src/modules/user\.ts:1 missing test tests/modules/user\.test\.ts$' "$OUTPUT"
 }
+
+test_a_module_in_a_folder_with_a_space_needs_its_test() {
+  local directory
+  directory=$(new_project '{"layout": "modular"}')
+  put "$directory/src/my mod/svc.ts" 'export function createUser() { return 1; }\n'
+  run_in "$directory" check src
+  assert_match '^error test-mirror src/my mod/svc\.ts:1 missing test tests/my mod/svc\.test\.ts$' "$OUTPUT"
+}
