@@ -11,6 +11,9 @@ FNR == NR {
 
 !started {
   started = 1
+  load_table(default_template, "python:test_{stem}.py go:{stem}_test.go rust:{stem}.rs java:{stem}Test.{ext} kotlin:{stem}Test.{ext} php:{stem}Test.{ext} csharp:{stem}Tests.cs ruby:{stem}_spec.rb", " ")
+  jvm_names = "{stem}Test.java|{stem}Tests.java|{stem}Test.kt|{stem}Tests.kt|{stem}IT.java|{stem}Spec.kt"
+  load_table(names_template, "python:test_{stem}.py|{stem}_test.py go: rust: java:" jvm_names " kotlin:" jvm_names " csharp:{stem}Tests.cs|{stem}Test.cs php:{stem}Test.php ruby:{stem}_spec.rb|{stem}_test.rb|test_{stem}.rb", " ")
   suffix = cfg_get("testSuffix")
   other_suffix = suffix == "test" ? "spec" : "test"
   root_count = cfg_list("sourceRoot", roots)
@@ -83,49 +86,32 @@ function mirror_directory(path,    directory, position, best, relative) {
   return relative == "." ? location : location "/" relative
 }
 
+# Expands {stem} and {ext} in one pass, so a file name containing either word or "&" comes out as written.
+function fill_template(template, stem, extension,    out, at) {
+  out = ""
+  while ((at = index(template, "{")) > 0) {
+    out = out substr(template, 1, at - 1)
+    if (substr(template, at, 6) == "{stem}") {
+      out = out stem
+      template = substr(template, at + 6)
+    } else if (substr(template, at, 5) == "{ext}") {
+      out = out extension
+      template = substr(template, at + 5)
+    } else {
+      out = out "{"
+      template = substr(template, at + 1)
+    }
+  }
+  return out template
+}
+
 function default_test_name(language, stem, extension) {
-  if (language == "python") {
-    return "test_" stem ".py"
-  }
-  if (language == "go") {
-    return stem "_test.go"
-  }
-  if (language == "rust") {
-    return stem ".rs"
-  }
-  if (language == "java" || language == "kotlin" || language == "php") {
-    return stem "Test." extension
-  }
-  if (language == "csharp") {
-    return stem "Tests.cs"
-  }
-  if (language == "ruby") {
-    return stem "_spec.rb"
-  }
-  return stem "_test." extension
+  return fill_template(language in default_template ? default_template[language] : "{stem}_test.{ext}", stem, extension)
 }
 
 function test_names(language, stem, extension,    out, count, position, extensions) {
-  if (language == "python") {
-    return "test_" stem ".py|" stem "_test.py"
-  }
-  if (language == "go") {
-    return ""
-  }
-  if (language == "rust") {
-    return ""
-  }
-  if (language == "java" || language == "kotlin") {
-    return stem "Test.java|" stem "Tests.java|" stem "Test.kt|" stem "Tests.kt|" stem "IT.java|" stem "Spec.kt"
-  }
-  if (language == "csharp") {
-    return stem "Tests.cs|" stem "Test.cs"
-  }
-  if (language == "php") {
-    return stem "Test.php"
-  }
-  if (language == "ruby") {
-    return stem "_spec.rb|" stem "_test.rb|test_" stem ".rb"
+  if (language in names_template) {
+    return fill_template(names_template[language], stem, extension)
   }
   out = ""
   count = split(language_extensions(language), extensions, " ")
