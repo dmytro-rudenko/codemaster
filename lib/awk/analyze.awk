@@ -89,7 +89,95 @@ function run_checks(    position) {
   check_global_functions()
   check_naming()
   check_function_rules()
+  check_repeated_arrays()
   printf "@functions\t-\t%d\t\t\n", count_named_functions()
+}
+
+function check_repeated_arrays(    limit, current, kind, count) {
+  if (!SCRIPT && LANGUAGE != "python") {
+    return
+  }
+  if (role == "consts" || role == "interfaces" || role == "test") {
+    return
+  }
+  limit = rule_limit("array-repeated-elements", 3)
+  kind = SCRIPT ? "array" : "list"
+  for (current = 1; current <= node_total; current++) {
+    if (node_kind[current] != kind) {
+      continue
+    }
+    count = repeated_run(current, limit)
+    if (count > 0) {
+      finding("warning", "array-repeated-elements", line_of(current), "array has " count " elements of the same shape; build it with a for loop")
+    }
+  }
+}
+
+function is_number_literal(node) {
+  if (SCRIPT) {
+    return node_kind[node] == "number"
+  }
+  return node_kind[node] == "integer" || node_kind[node] == "float"
+}
+
+function is_compound(node,    kids) {
+  return !node_is("literal", node) && named_children(node, kids) > 0
+}
+
+function repeated_run(node, limit,    elements, total, position, run, longest, shape, previous, step) {
+  total = named_children(node, elements)
+  longest = 0
+  run = 0
+  previous = ""
+  for (position = 1; position <= total; position++) {
+    if (!is_compound(elements[position])) {
+      run = 0
+      previous = ""
+      continue
+    }
+    shape = element_shape(elements[position])
+    run = (run > 0 && shape == previous) ? run + 1 : 1
+    previous = shape
+    if (run > longest) {
+      longest = run
+    }
+  }
+  if (longest > limit) {
+    return longest
+  }
+  if (total <= limit + 1) {
+    return 0
+  }
+  for (position = 1; position <= total; position++) {
+    if (!is_number_literal(elements[position])) {
+      return 0
+    }
+  }
+  step = node_text(elements[2]) - node_text(elements[1])
+  if (step == 0) {
+    return 0
+  }
+  for (position = 2; position < total; position++) {
+    if (node_text(elements[position + 1]) - node_text(elements[position]) != step) {
+      return 0
+    }
+  }
+  return total
+}
+
+function element_shape(node,    kids, total, position, shapes) {
+  if (node_is("literal", node) || node_kind[node] == "jsx_text") {
+    return "L"
+  }
+  if (node_is("identifier", node)) {
+    return node_kind[node] ":" node_text(node)
+  }
+  total = named_children(node, kids)
+  shapes = ""
+  for (position = 1; position <= total; position++) {
+    shapes = shapes (position > 1 ? "," : "") element_shape(kids[position])
+  }
+  return node_kind[node] "(" shapes ")"
 }
 
 function count_named_functions(    current, total) {
