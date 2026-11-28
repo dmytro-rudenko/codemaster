@@ -9,7 +9,7 @@ fun walk(items: List<Int>): Int {
         for (item in items) {
             while (item > 0) {
                 if (item > 1) {
-                    break
+                    if (item > 2) { break }
                 }
             }
         }

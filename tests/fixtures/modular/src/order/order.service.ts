@@ -4,7 +4,7 @@ export function walkOrders(orders: number[]) {
     while (total < 10) {
       for (const order of orders) {
         if (order > 1) {
-          total += order;
+          if (order > 2) { total += order; }
         }
       }
       total += 1;

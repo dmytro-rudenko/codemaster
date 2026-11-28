@@ -10,6 +10,6 @@ def walk(items):
         for item in items:
             while item:
                 if item > 1:
-                    item -= 1
+                    if item > 2: item -= 1
     cfg = load(parse(read(open_file())))
     return cfg

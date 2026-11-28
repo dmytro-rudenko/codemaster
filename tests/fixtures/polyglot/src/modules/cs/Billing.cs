@@ -17,7 +17,7 @@ public class Billing
                 {
                     if (item > 1)
                     {
-                        break;
+                        if (item > 2) { break; }
                     }
                 }
             }

@@ -10,7 +10,7 @@ helpers-only-functions src/user/user.helpers.ts:1
 layout-forbidden-declaration src/user/user.service.ts:1
 layout-forbidden-declaration src/user/user.service.ts:4
 max-call-nesting src/old/legacy.ts:2
-max-nesting src/order/order.service.ts:6
+max-nesting src/order/order.service.ts:7
 max-params src/old/legacy.ts:1
 max-params src/user/user.service.ts:3
 name-abbreviation src/user/user.service.ts:4
@@ -99,10 +99,10 @@ test_a_path_without_source_files_is_an_error() {
 test_rule_settings_switch_a_rule_off_or_raise_its_limit() {
   local directory
   directory=$(copy_fixture off)
-  printf 'export const userAccountProfileName = "x";\n' > "$directory/src/pages/profile.ts"
+  printf 'export const userAccountProfileDisplayName = "x";\n' > "$directory/src/pages/profile.ts"
   run_in "$directory" check src
   assert_contains "$(triples "$OUTPUT")" "name-word-count src/pages/profile.ts:1"
-  printf '{"rules": {"max-params": "off", "name-word-count": {"max": 4}}}' > "$directory/.codemaster.json"
+  printf '{"rules": {"max-params": "off", "name-word-count": {"max": 5}}}' > "$directory/.codemaster.json"
   run_in "$directory" check src
   assert_equal "" "$(triples "$OUTPUT")"
   assert_equal 0 "$STATUS"

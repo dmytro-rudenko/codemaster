@@ -10,7 +10,7 @@ public class Billing {
       for (int item : items) {
         while (item > 0) {
           if (item > 1) {
-            item--;
+            if (item > 2) { item--; }
           }
         }
       }
