@@ -1,5 +1,6 @@
 # Test files that count as the mirror of a source file.
-# The first input file is the flat config; then role lines "path<TAB>role<TAB>entity<TAB>global<TAB>language".
+# The first input file is the flat config; then role lines "path<TAB>role<TAB>entity<TAB>global<TAB>language<TAB>functions"
+# (functions: the count of named functions; a file without any needs no test).
 # -v location=<tests folder>. Prints "path<TAB>severity<TAB>expected<TAB>paths<TAB>names":
 # paths are exact candidates ("|"-separated); names are file names accepted anywhere in the project.
 # POSIX awk, with util.awk, cfg.awk and lang.awk.
@@ -30,7 +31,7 @@ FNR == NR {
   language = $5
   strict = role == "module" || role == "single-file-module"
   lenient = role == "helper" || role == "util"
-  if (!strict && !lenient) {
+  if ((!strict && !lenient) || $6 == "0") {
     next
   }
   name = path_basename(path)

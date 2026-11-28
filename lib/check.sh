@@ -188,7 +188,7 @@ cm_scan_rule() {
 
 # cm_run_checks <files file>: writes sorted raw findings to $CM_TMP/findings; sets CM_CHECKED_COUNT.
 cm_run_checks() {
-  local files="$1" path role entity global language line severity rule message reason
+  local files="$1" path role entity global language line severity rule message reason functions
   cm_detect_layout > /dev/null
   : > "$CM_TMP/findings.raw"
   cm_roles < "$files" > "$CM_TMP/roles"
@@ -198,12 +198,17 @@ cm_run_checks() {
   while IFS="$(printf '\t')" read -r path role entity global language; do
     [ -n "$path" ] || continue
     cm_analyze_file "$path" "$role" "$entity" "$global" "$language" check > "$CM_TMP/file.findings"
+    functions=0
     while IFS="$(printf '\t')" read -r severity rule line message reason; do
       [ -n "$rule" ] || continue
+      if [ "$severity" = "@functions" ]; then
+        functions="$line"
+        continue
+      fi
       printf '%s\t%s\t%s\t%s\t%s\n' "$path" "$line" "$severity" "$rule" "$message" >> "$CM_TMP/findings.raw"
     done < "$CM_TMP/file.findings"
     if ! grep -q "$(printf '^[a-z]*\tparse\t')" "$CM_TMP/file.findings"; then
-      printf '%s\t%s\t%s\t%s\t%s\n' "$path" "$role" "$entity" "$global" "$language" >> "$CM_TMP/parsed.roles"
+      printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$path" "$role" "$entity" "$global" "$language" "$functions" >> "$CM_TMP/parsed.roles"
     fi
   done < "$CM_TMP/roles"
   if [ "$(cm_detect_layout)" != "off" ]; then

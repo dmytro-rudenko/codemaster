@@ -89,6 +89,21 @@ function run_checks(    position) {
   check_global_functions()
   check_naming()
   check_function_rules()
+  printf "@functions\t-\t%d\t\t\n", count_named_functions()
+}
+
+function count_named_functions(    current, total) {
+  total = 0
+  for (current = 1; current <= node_total; current++) {
+    if (!is_function(current)) {
+      continue
+    }
+    resolve_function_name(current)
+    if (FUNCTION_NAME != "") {
+      total++
+    }
+  }
+  return total
 }
 
 function forbidden_kind(kind) {
