@@ -21,6 +21,7 @@ function roles_init(    items, count, position, root) {
   }
   entry_count = cfg_list("entrypoints", entry_glob)
   tests_location = cfg_get("testsLocation")
+  sub(/^\.\//, "", tests_location)
   sub(/\/+$/, "", tests_location)
   split("interfaces:interfaces interface:interfaces types:interfaces type:interfaces consts:consts const:consts constants:consts constant:consts helpers:helper helper:helper utils:util util:util", pairs, " ")
   for (position = 1; position in pairs; position++) {
