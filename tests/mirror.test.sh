@@ -39,3 +39,22 @@ test_a_class_method_counts_as_a_function() {
   run_in "$directory" check src
   assert_match '^error test-mirror src/modules/account\.ts:1 ' "$OUTPUT"
 }
+
+test_a_file_without_a_function_count_still_needs_its_test() {
+  local flat
+  flat="$TEST_TMP/config.flat"
+  awk -f "$PLUGIN_ROOT/lib/awk/json.awk" "$PLUGIN_ROOT/lib/defaults.json" > "$flat"
+  OUTPUT=$(printf 'src/modules/user.ts\tsingle-file-module\tuser\t0\ttypescript\t-\n' |
+    LC_ALL=C awk -f "$PLUGIN_ROOT/lib/awk/util.awk" -f "$PLUGIN_ROOT/lib/awk/cfg.awk" -f "$PLUGIN_ROOT/lib/awk/lang.awk" \
+      -f "$PLUGIN_ROOT/lib/awk/mirror.awk" -v location=tests "$flat" -)
+  assert_match '^src/modules/user\.ts	error	tests/modules/user\.test\.ts	' "$OUTPUT"
+}
+
+test_a_trailing_slash_in_the_tests_folder_is_ignored() {
+  local directory
+  directory=$(new_project '{"layout": "layered", "testsLocation": "tests/"}')
+  put "$directory/src/modules/user.ts" 'export function createUser() { return 1; }\n'
+  put "$directory/src/consts/global.ts" 'export const LIMIT = 1;\n'
+  run_in "$directory" check src
+  assert_match '^error test-mirror src/modules/user\.ts:1 missing test tests/modules/user\.test\.ts$' "$OUTPUT"
+}

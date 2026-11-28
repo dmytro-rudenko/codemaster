@@ -198,7 +198,7 @@ cm_run_checks() {
   while IFS="$(printf '\t')" read -r path role entity global language; do
     [ -n "$path" ] || continue
     cm_analyze_file "$path" "$role" "$entity" "$global" "$language" check > "$CM_TMP/file.findings"
-    functions=0
+    functions=-
     while IFS="$(printf '\t')" read -r severity rule line message reason; do
       [ -n "$rule" ] || continue
       if [ "$severity" = "@functions" ]; then
