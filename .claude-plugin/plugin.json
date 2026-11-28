@@ -6,6 +6,32 @@
   "author": {
     "name": "dmytro-rudenko"
   },
+  "homepage": "https://github.com/dmytro-rudenko/codemaster",
+  "repository": "https://github.com/dmytro-rudenko/codemaster",
   "license": "MIT",
-  "keywords": ["claude-code", "lint", "code-style", "typescript", "python", "go", "rust", "java", "kotlin", "csharp", "php", "ruby", "c", "cpp", "ast-grep", "hooks", "bash"]
+  "keywords": [
+    "claude-code",
+    "lint",
+    "code-style",
+    "typescript",
+    "python",
+    "go",
+    "rust",
+    "java",
+    "kotlin",
+    "csharp",
+    "php",
+    "ruby",
+    "c",
+    "cpp",
+    "ast-grep",
+    "hooks",
+    "bash"
+  ],
+  "icon": "./.claude-plugin/icon.png",
+  "network": {
+    "hosts": [
+      "registry.npmjs.org"
+    ]
+  }
 }

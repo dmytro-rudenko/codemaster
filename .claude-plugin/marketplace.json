@@ -1,5 +1,6 @@
 {
   "name": "codemaster",
+  "description": "Codemaster: code-organisation checks and fixes for Claude Code across 12 languages.",
   "owner": {
     "name": "dmytro-rudenko"
   },
