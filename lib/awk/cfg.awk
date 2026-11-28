@@ -43,7 +43,7 @@ function cfg_joined(path,    items, count, position, out) {
 }
 
 function cfg_severity_default(rule) {
-  if (rule == "single-file-module-size" || rule == "helpers-mixed-kind" || rule == "name-word-count" || rule == "max-call-nesting" || rule == "prefer-destructuring" || rule == "simple-package" || rule == "parse" || rule == "ast-grep") {
+  if (rule == "single-file-module-size" || rule == "file-name-suffix" || rule == "array-repeated-elements" || rule == "lookup-chain" || rule == "helpers-mixed-kind" || rule == "name-word-count" || rule == "max-call-nesting" || rule == "prefer-destructuring" || rule == "simple-package" || rule == "parse" || rule == "ast-grep") {
     return "warning"
   }
   return "error"

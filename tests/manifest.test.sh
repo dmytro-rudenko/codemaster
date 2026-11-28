@@ -10,9 +10,9 @@ json_value() {
 
 test_plugin_manifest() {
   assert_equal "codemaster" "$(json_value .claude-plugin/plugin.json name)"
-  assert_equal "0.2.1" "$(json_value .claude-plugin/plugin.json version)"
+  assert_equal "0.3.0" "$(json_value .claude-plugin/plugin.json version)"
   assert_equal "./hooks/hooks.json" "$(json_value .claude-plugin/plugin.json hooks)"
-  assert_equal "0.2.1" "$(json_value .claude-plugin/marketplace.json plugins/0/version)"
+  assert_equal "0.3.0" "$(json_value .claude-plugin/marketplace.json plugins/0/version)"
 }
 
 test_hooks_run_the_bash_cli() {
@@ -26,9 +26,9 @@ test_hooks_run_the_bash_cli() {
 
 test_skills_carry_their_names_and_versions() {
   assert_match '^name: codemaster$' "$(frontmatter skills/codemaster/SKILL.md)"
-  assert_match '^version: 0\.2\.1$' "$(frontmatter skills/codemaster/SKILL.md)"
+  assert_match '^version: 0\.3\.0$' "$(frontmatter skills/codemaster/SKILL.md)"
   assert_match '^name: codemaster-audit$' "$(frontmatter skills/codemaster-audit/SKILL.md)"
-  assert_match '^version: 0\.2\.1$' "$(frontmatter skills/codemaster-audit/SKILL.md)"
+  assert_match '^version: 0\.3\.0$' "$(frontmatter skills/codemaster-audit/SKILL.md)"
 }
 
 test_readme_in_english_with_an_install_section() {

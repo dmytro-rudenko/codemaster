@@ -10,6 +10,32 @@ function extension_of(path,    name) {
   return tolower(name)
 }
 
+# Fills table from "key:value" entries joined by separator.
+function load_table(table, entries, separator,    count, position, pairs, colon) {
+  count = split(entries, pairs, separator)
+  for (position = 1; position <= count; position++) {
+    colon = index(pairs[position], ":")
+    table[substr(pairs[position], 1, colon - 1)] = substr(pairs[position], colon + 1)
+  }
+}
+
+# Fills the extension tables on first use, so every program that includes this file can call them.
+function lang_tables(    script) {
+  if (lang_ready) {
+    return
+  }
+  lang_ready = 1
+  load_table(extension_language, "ts:typescript mts:typescript cts:typescript tsx:tsx js:javascript mjs:javascript cjs:javascript jsx:javascript py:python go:go rs:rust java:java kt:kotlin kts:kotlin cs:csharp php:php rb:ruby c:c h:c cc:cpp cpp:cpp cxx:cpp hpp:cpp hh:cpp hxx:cpp", " ")
+  script = "ts tsx mts cts js jsx mjs cjs"
+  load_table(language_extension_list, "typescript:" script "|tsx:" script "|javascript:" script "|python:py|go:go|rust:rs|java:java kt|kotlin:kt kts java|csharp:cs|php:php|ruby:rb|c:c cc cpp|cpp:cpp cc cxx c", "|")
+  load_table(style_extension, "css:1 scss:1 sass:1 less:1", " ")
+}
+
+function is_style_file(path) {
+  lang_tables()
+  return extension_of(path) in style_extension
+}
+
 # ast-grep language name of a path, or "" when codemaster does not read it.
 function language_of(path,    extension, name) {
   name = path
@@ -17,47 +43,9 @@ function language_of(path,    extension, name) {
   if (name ~ /\.d\.[mc]?ts$/ || name ~ /\.min\.js$/ || name ~ /\.pb\.go$/ || name ~ /_pb2\.py$/) {
     return ""
   }
+  lang_tables()
   extension = extension_of(path)
-  if (extension == "ts" || extension == "mts" || extension == "cts") {
-    return "typescript"
-  }
-  if (extension == "tsx") {
-    return "tsx"
-  }
-  if (extension == "js" || extension == "mjs" || extension == "cjs" || extension == "jsx") {
-    return "javascript"
-  }
-  if (extension == "py") {
-    return "python"
-  }
-  if (extension == "go") {
-    return "go"
-  }
-  if (extension == "rs") {
-    return "rust"
-  }
-  if (extension == "java") {
-    return "java"
-  }
-  if (extension == "kt" || extension == "kts") {
-    return "kotlin"
-  }
-  if (extension == "cs") {
-    return "csharp"
-  }
-  if (extension == "php") {
-    return "php"
-  }
-  if (extension == "rb") {
-    return "ruby"
-  }
-  if (extension == "c" || extension == "h") {
-    return "c"
-  }
-  if (extension == "cc" || extension == "cpp" || extension == "cxx" || extension == "hpp" || extension == "hh" || extension == "hxx") {
-    return "cpp"
-  }
-  return ""
+  return (extension in extension_language) ? extension_language[extension] : ""
 }
 
 # The name used in the "languages" config field.
@@ -85,35 +73,6 @@ function in_ignored_directory(path,    parts, count, position) {
 
 # The usual extensions of a language, for looking up test files.
 function language_extensions(language) {
-  if (language == "typescript" || language == "tsx" || language == "javascript") {
-    return "ts tsx mts cts js jsx mjs cjs"
-  }
-  if (language == "python") {
-    return "py"
-  }
-  if (language == "go") {
-    return "go"
-  }
-  if (language == "rust") {
-    return "rs"
-  }
-  if (language == "java") {
-    return "java kt"
-  }
-  if (language == "kotlin") {
-    return "kt kts java"
-  }
-  if (language == "csharp") {
-    return "cs"
-  }
-  if (language == "php") {
-    return "php"
-  }
-  if (language == "ruby") {
-    return "rb"
-  }
-  if (language == "c") {
-    return "c cc cpp"
-  }
-  return "cpp cc cxx c"
+  lang_tables()
+  return (language in language_extension_list) ? language_extension_list[language] : language_extension_list["cpp"]
 }

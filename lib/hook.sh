@@ -113,7 +113,7 @@ cm_write_path_list() {
 # cm_record_checked <checked paths file>: keeps recorded entries of still-changed files, sets checked files and manifests.
 cm_record_checked() {
   local checked="$1"
-  cm_awk -F '\t' -v changed="$CM_TMP/hook.changed" -v current="$CM_TMP/hook.current" -v manifests="$CM_TMP/hook.manifests" '
+  cm_awk -F '\t' -v changed="$CM_TMP/hook.tracked" -v current="$CM_TMP/hook.current" -v manifests="$CM_TMP/hook.manifests" '
     BEGIN {
       while ((getline line < changed) > 0) is_changed[line] = 1
       while ((getline line < current) > 0) { split(line, parts, "\t"); hash[parts[1]] = parts[2] }
@@ -147,21 +147,24 @@ cm_hook_stop() {
   CM_HOOK_STATE="$state/$CM_HOOK_STATE_FILE"
   cm_changed_paths > "$CM_TMP/hook.paths"
   cm_select_sources < "$CM_TMP/hook.paths" > "$CM_TMP/hook.changed"
+  cm_select_styles < "$CM_TMP/hook.paths" > "$CM_TMP/hook.styles"
   cm_awk '{ name = $0; sub(/^.*\//, "", name) } name == "package.json" && $0 !~ /(^|\/)(node_modules|\.git)\// { print }' "$CM_TMP/hook.paths" > "$CM_TMP/hook.changed.manifests"
   { printf 'package.json\n'; cat "$CM_TMP/hook.changed.manifests"; } | LC_ALL=C sort -u > "$CM_TMP/hook.manifests"
-  cat "$CM_TMP/hook.changed" "$CM_TMP/hook.manifests" | LC_ALL=C sort -u | cm_current_hashes > "$CM_TMP/hook.current"
+  cat "$CM_TMP/hook.changed" "$CM_TMP/hook.styles" | LC_ALL=C sort -u > "$CM_TMP/hook.tracked"
+  cat "$CM_TMP/hook.tracked" "$CM_TMP/hook.manifests" | LC_ALL=C sort -u | cm_current_hashes > "$CM_TMP/hook.current"
   cm_read_state "$CM_HOOK_STATE" > "$CM_TMP/hook.recorded"
   cm_awk -F '\t' -v recorded="$CM_TMP/hook.recorded" '
     BEGIN { while ((getline line < recorded) > 0) { split(line, parts, "\t"); old[parts[1]] = parts[2] } }
     { if (!($1 in old) || old[$1] != $2) print $1 }' "$CM_TMP/hook.current" > "$CM_TMP/hook.stale"
   grep -F -x -f "$CM_TMP/hook.changed" "$CM_TMP/hook.stale" > "$CM_TMP/hook.pending" 2>/dev/null
-  if [ ! -s "$CM_TMP/hook.pending" ] && ! grep -q -F -x -f "$CM_TMP/hook.changed.manifests" "$CM_TMP/hook.stale" 2>/dev/null; then
+  grep -F -x -f "$CM_TMP/hook.styles" "$CM_TMP/hook.stale" > "$CM_TMP/hook.pending.styles" 2>/dev/null
+  if [ ! -s "$CM_TMP/hook.pending" ] && [ ! -s "$CM_TMP/hook.pending.styles" ] && ! grep -q -F -x -f "$CM_TMP/hook.changed.manifests" "$CM_TMP/hook.stale" 2>/dev/null; then
     return 0
   fi
   active=$(cm_flat_get stop_hook_active < "$CM_TMP/hook.flat")
   if [ "$active" = "true" ]; then
     cm_read_deferred "$state/$CM_HOOK_DEFERRED_FILE" > "$CM_TMP/hook.deferred"
-    grep -v -F -x -f "$CM_TMP/hook.deferred" "$CM_TMP/hook.pending" > "$CM_TMP/hook.checked"
+    { grep -v -F -x -f "$CM_TMP/hook.deferred" "$CM_TMP/hook.pending"; cat "$CM_TMP/hook.pending.styles"; } > "$CM_TMP/hook.checked"
     cm_record_checked "$CM_TMP/hook.checked"
     return 0
   fi
@@ -184,7 +187,7 @@ cm_hook_stop() {
     { printf 'layout\tauto\n'; cat "$CM_TMP/profile.sources"; } > "$CM_TMP/first.sources"
     profile=$(cm_format_profile "$CM_CONFIG" "$CM_TMP/first.sources" "$(cm_detect_layout)")
   fi
-  cm_run_checks "$CM_TMP/hook.files"
+  cm_run_checks "$CM_TMP/hook.files" "$CM_TMP/hook.pending.styles"
   cm_report hook > "$CM_TMP/hook.report"
   grep -v '^@@summary' "$CM_TMP/hook.report" > "$CM_TMP/hook.findings"
   cm_find_candidates "$CM_TMP/hook.files" > "$CM_TMP/hook.candidates" 2>> "$CM_TMP/hook.warnings"
@@ -193,7 +196,8 @@ cm_hook_stop() {
   if [ "$(cm_cfg libraryDigest)" = "true" ]; then
     cm_library_summary "$CM_HOOK_LIBRARIES_LIMIT" > "$CM_TMP/hook.libraries"
   fi
-  cm_record_checked "$CM_TMP/hook.files"
+  cat "$CM_TMP/hook.files" "$CM_TMP/hook.pending.styles" > "$CM_TMP/hook.checked"
+  cm_record_checked "$CM_TMP/hook.checked"
   tail -n +"$((CM_HOOK_FILES_LIMIT + 1))" "$CM_TMP/hook.pending" > "$CM_TMP/hook.later"
   cm_write_path_list "$CM_TMP/hook.later" "$state/$CM_HOOK_DEFERRED_FILE"
   if [ -z "$profile" ] && [ ! -s "$CM_TMP/hook.findings" ] && [ ! -s "$CM_TMP/hook.candidates" ] && [ "$CM_LIBRARIES_BLOCKING" -eq 0 ]; then

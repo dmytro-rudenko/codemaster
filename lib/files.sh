@@ -13,10 +13,18 @@ cm_select_sources() {
   done
 }
 
-# Every source file of the project: git's view in a repository, else a walk of the folders.
+# Filters project paths on stdin to existing style files outside ignored folders and "exclude".
+cm_select_styles() {
+  local path
+  cm_files_awk -v mode=filter -v want=styles "$CM_CONFIG" - | while IFS= read -r path; do
+    [ -f "$CM_PROJECT_ROOT/$path" ] && printf '%s\n' "$path"
+  done
+}
+
+# Every source file of the project (CM_SELECT picks another selector): git's view in a repository, else a walk of the folders.
 cm_all_sources() {
   if cm_is_repository; then
-    cm_tracked_paths | cm_select_sources
+    cm_tracked_paths | "${CM_SELECT:-cm_select_sources}"
   else
     cm_walk_sources ""
   fi
@@ -28,14 +36,14 @@ cm_walk_sources() {
   start="$CM_PROJECT_ROOT"
   [ -n "$target" ] && start="$CM_PROJECT_ROOT/$target"
   if [ -f "$start" ]; then
-    printf '%s\n' "$target" | cm_select_sources
+    printf '%s\n' "$target" | "${CM_SELECT:-cm_select_sources}"
     return 0
   fi
   [ -d "$start" ] || return 0
   (
     cd "$CM_PROJECT_ROOT" || exit 0
     find "./${target:-.}" \( -name .git -o -name node_modules \) -prune -o -type f -print 2>/dev/null
-  ) | sed -e 's#^\./##' -e 's#^\./##' -e 's#//*#/#g' | LC_ALL=C sort | cm_select_sources
+  ) | sed -e 's#^\./##' -e 's#^\./##' -e 's#//*#/#g' | LC_ALL=C sort | "${CM_SELECT:-cm_select_sources}"
 }
 
 cm_detect_layout() {
@@ -75,12 +83,11 @@ cm_roles() {
   cm_files_awk -v mode=roles -v layout="$(cm_detect_layout)" "$CM_CONFIG" -
 }
 
+# The tests folder, without a leading "./" or trailing "/"; "tests" when the profile leaves it empty.
 cm_tests_location() {
-  if [ -n "$CM_CFG_TESTS_LOCATION" ]; then
-    printf '%s\n' "$CM_CFG_TESTS_LOCATION"
-  elif [ "$(cm_detect_layout)" = "layered" ]; then
-    printf 'tests\n'
-  else
-    printf 'colocated\n'
-  fi
+  local location="${CM_CFG_TESTS_LOCATION#./}"
+  while [ "${location%/}" != "$location" ]; do
+    location="${location%/}"
+  done
+  printf '%s\n' "${location:-tests}"
 }

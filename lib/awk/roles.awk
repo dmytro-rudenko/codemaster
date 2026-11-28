@@ -21,6 +21,7 @@ function roles_init(    items, count, position, root) {
   }
   entry_count = cfg_list("entrypoints", entry_glob)
   tests_location = cfg_get("testsLocation")
+  sub(/^\.\//, "", tests_location)
   sub(/\/+$/, "", tests_location)
   split("interfaces:interfaces interface:interfaces types:interfaces type:interfaces consts:consts const:consts constants:consts constant:consts helpers:helper helper:helper utils:util util:util", pairs, " ")
   for (position = 1; position in pairs; position++) {
@@ -73,18 +74,24 @@ function is_test_name(name) {
   return name ~ /[a-z0-9](Test|Tests|Spec|IT)\.(java|kt|kts|cs|php)$/
 }
 
-function is_test_path(path,    segments, count) {
+function is_test_folder(name) {
+  return name == "tests" || name == "test" || name == "__tests__" || name == "spec"
+}
+
+function is_test_path(path,    segments, count, position) {
   count = split(path, segments, "/")
   if (is_test_name(segments[count])) {
     return 1
   }
-  if (segments[1] == "tests" || segments[1] == "test" || segments[1] == "__tests__" || segments[1] == "spec") {
-    return 1
+  for (position = 1; position < count; position++) {
+    if (is_test_folder(segments[position])) {
+      return 1
+    }
   }
   if (path ~ /(^|\/)src\/test\//) {
     return 1
   }
-  return tests_location != "" && tests_location != "colocated" && (path == tests_location || substr(path, 1, length(tests_location) + 1) == tests_location "/")
+  return tests_location != "" && (path == tests_location || substr(path, 1, length(tests_location) + 1) == tests_location "/")
 }
 
 # Fills relative[1..n] with the segments below the deepest source root holding the path; returns n or 0.

@@ -9,7 +9,7 @@ fn walk(items: Vec<i32>) -> i32 {
         for item in items {
             while item > 0 {
                 if item > 1 {
-                    break;
+                    if item > 2 { break; }
                 }
             }
         }

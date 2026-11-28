@@ -9,7 +9,7 @@ int walk(int *items, int count) {
     for (int position = 0; position < count; position++) {
       while (items[position] > 0) {
         if (items[position] > 1) {
-          items[position]--;
+          if (items[position] > 2) { items[position]--; }
         }
       }
     }

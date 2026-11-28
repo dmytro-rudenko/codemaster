@@ -72,6 +72,18 @@ cm_project_basenames() {
   fi
 }
 
+# Reads role lines on stdin; prints test-placement findings.
+cm_check_placement() {
+  cm_awk -f "$CM_AWK_DIR/util.awk" -f "$CM_AWK_DIR/cfg.awk" -f "$CM_AWK_DIR/lang.awk" -f "$CM_AWK_DIR/roles.awk" \
+    -f "$CM_AWK_DIR/placement.awk" -v location="$(cm_tests_location)" "$CM_CONFIG" -
+}
+
+# Reads role lines on stdin (style files with role "style"); prints file-name-suffix findings.
+cm_check_names() {
+  cm_awk -f "$CM_AWK_DIR/util.awk" -f "$CM_AWK_DIR/cfg.awk" -f "$CM_AWK_DIR/lang.awk" -f "$CM_AWK_DIR/roles.awk" \
+    -f "$CM_AWK_DIR/names.awk" "$CM_CONFIG" -
+}
+
 # Reads role lines on stdin; prints test-mirror findings.
 cm_check_mirrors() {
   local path severity expected paths names candidate found
@@ -180,23 +192,32 @@ cm_scan_rule() {
   fi
 }
 
-# cm_run_checks <files file>: writes sorted raw findings to $CM_TMP/findings; sets CM_CHECKED_COUNT.
+# cm_run_checks <files file> [styles file]: writes sorted raw findings to $CM_TMP/findings; sets CM_CHECKED_COUNT.
 cm_run_checks() {
-  local files="$1" path role entity global language line severity rule message reason
+  local files="$1" styles="${2:-}" path role entity global language line severity rule message reason functions
   cm_detect_layout > /dev/null
-  cm_roles < "$files" > "$CM_TMP/roles"
-  CM_CHECKED_COUNT=$(LC_ALL=C sort -u "$files" | grep -c .)
   : > "$CM_TMP/findings.raw"
+  cm_roles < "$files" > "$CM_TMP/roles"
+  cm_check_placement < "$CM_TMP/roles" >> "$CM_TMP/findings.raw"
+  { cm_awk -F '\t' '$2 == "consts" || $2 == "interfaces"' "$CM_TMP/roles"
+    [ -n "$styles" ] && [ -f "$styles" ] && cm_awk '{ printf "%s\tstyle\t-\t0\tstyle\n", $0 }' "$styles"
+  } | cm_check_names >> "$CM_TMP/findings.raw"
+  CM_CHECKED_COUNT=$(LC_ALL=C sort -u "$files" | grep -c .)
   : > "$CM_TMP/parsed.roles"
   while IFS="$(printf '\t')" read -r path role entity global language; do
     [ -n "$path" ] || continue
     cm_analyze_file "$path" "$role" "$entity" "$global" "$language" check > "$CM_TMP/file.findings"
+    functions=-
     while IFS="$(printf '\t')" read -r severity rule line message reason; do
       [ -n "$rule" ] || continue
+      if [ "$severity" = "@functions" ]; then
+        functions="$line"
+        continue
+      fi
       printf '%s\t%s\t%s\t%s\t%s\n' "$path" "$line" "$severity" "$rule" "$message" >> "$CM_TMP/findings.raw"
     done < "$CM_TMP/file.findings"
     if ! grep -q "$(printf '^[a-z]*\tparse\t')" "$CM_TMP/file.findings"; then
-      printf '%s\t%s\t%s\t%s\t%s\n' "$path" "$role" "$entity" "$global" "$language" >> "$CM_TMP/parsed.roles"
+      printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$path" "$role" "$entity" "$global" "$language" "$functions" >> "$CM_TMP/parsed.roles"
     fi
   done < "$CM_TMP/roles"
   if [ "$(cm_detect_layout)" != "off" ]; then
@@ -219,7 +240,7 @@ cm_expand_paths() {
   local target prefix tracked=""
   if cm_is_repository; then
     tracked="$CM_TMP/tracked"
-    cm_tracked_paths | cm_select_sources > "$tracked"
+    cm_tracked_paths | "${CM_SELECT:-cm_select_sources}" > "$tracked"
   fi
   CM_MISSING_PATH=""
   : > "$CM_TMP/expanded.all"
@@ -267,21 +288,24 @@ cm_check_command() {
         *) list[${#list[@]}]="$argument" ;;
       esac
     done
+    ( CM_SELECT=cm_select_styles; cm_expand_paths "${list[@]}" ) > "$CM_TMP/selected.styles"
     cm_expand_paths "${list[@]}" > "$CM_TMP/selected"
     if [ -n "$CM_MISSING_PATH" ]; then
       printf 'codemaster: no source files match %s\n' "$CM_MISSING_PATH"
       return 2
     fi
   elif [ "$all" -eq 1 ]; then
+    ( CM_SELECT=cm_select_styles; cm_all_sources ) > "$CM_TMP/selected.styles"
     cm_all_sources > "$CM_TMP/selected"
   elif cm_is_repository; then
+    cm_changed_paths | cm_select_styles > "$CM_TMP/selected.styles"
     cm_changed_paths | cm_select_sources > "$CM_TMP/selected"
   else
     printf 'codemaster: not a git repository; pass paths\n'
     return 0
   fi
   cm_ensure_ast_grep || return 1
-  cm_run_checks "$CM_TMP/selected"
+  cm_run_checks "$CM_TMP/selected" "$CM_TMP/selected.styles"
   if [ "$json" -eq 1 ]; then
     cm_report json
   else

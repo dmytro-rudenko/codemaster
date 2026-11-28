@@ -35,7 +35,7 @@
     "helper": ["helpers"],
     "util": ["utils", "util", "shared", "common", "lib"]
   },
-  "testsLocation": "",
+  "testsLocation": "tests",
   "testSuffix": "test",
   "constantCase": "upper-snake",
   "interfacePrefix": "",

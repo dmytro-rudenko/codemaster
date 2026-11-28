@@ -5,7 +5,7 @@
 CM_SELF="${BASH_SOURCE[0]}"
 CM_SELF="${CM_SELF//\\//}"
 CM_ROOT=$(cd "$(dirname "$CM_SELF")/.." && pwd)
-CM_VERSION="0.2.0"
+CM_VERSION="0.3.0"
 
 . "$CM_ROOT/lib/common.sh"
 . "$CM_ROOT/lib/config.sh"

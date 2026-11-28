@@ -12,7 +12,7 @@ function walk(array $items)
         foreach ($items as $item) {
             while ($item > 0) {
                 if ($item > 1) {
-                    $item--;
+                    if ($item > 2) { $item--; }
                 }
             }
         }

@@ -1,6 +1,6 @@
 ---
 name: codemaster-audit
-version: 0.2.1
+version: 0.3.0
 description: Use when the user asks to audit or clean up existing code with codemaster. Runs check --all, fixes errors one entity per batch with a commit each, and stops when the user says so.
 disable-model-invocation: true
 ---

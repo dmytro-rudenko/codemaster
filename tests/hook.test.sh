@@ -140,3 +140,29 @@ test_session_start_names_the_layout() {
   assert_equal 0 "$STATUS"
   assert_contains "$OUTPUT" "codemaster: layout=modular, sourceRoot=src"
 }
+
+test_a_stylesheet_change_alone_runs_the_hook() {
+  local directory
+  directory=$(prepared_repository)
+  mkdir -p "$directory/src/button"
+  printf '.button { color: red; }\n' > "$directory/src/button/button.styles.css"
+  stop_hook "$directory"
+  assert_equal 0 "$STATUS"
+  assert_contains "$OUTPUT" '"decision":"block"'
+  assert_contains "$(hook_reason "$OUTPUT")" "file-name-suffix src/button/button.styles.css:1"
+}
+
+test_a_reported_stylesheet_is_not_repeated_when_only_a_source_changes() {
+  local directory reason
+  directory=$(prepared_repository)
+  mkdir -p "$directory/src/button"
+  printf '.button { color: red; }\n' > "$directory/src/button/button.styles.css"
+  printf '%s\n' "$SIX_PARAMETERS" >> "$directory/src/user/user.service.ts"
+  stop_hook "$directory"
+  assert_contains "$(hook_reason "$OUTPUT")" "file-name-suffix src/button/button.styles.css:1"
+  printf '%s\n' "$SIX_PARAMETERS" >> "$directory/src/order/order.service.ts"
+  stop_hook "$directory"
+  reason=$(hook_reason "$OUTPUT")
+  assert_contains "$reason" "max-params src/order/order.service.ts"
+  assert_not_contains "$reason" "button.styles.css"
+}

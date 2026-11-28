@@ -9,7 +9,7 @@ export function walk(items) {
     for (const item of items) {
       while (item > 0) {
         if (item > 1) {
-          break;
+          if (item > 2) { break; }
         }
       }
     }

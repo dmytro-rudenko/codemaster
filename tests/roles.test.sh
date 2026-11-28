@@ -41,6 +41,7 @@ test_modular_roles() {
   assert_equal "util - 0" "$(role_of "$root" modular src/utils/format.ts)"
   assert_equal "other - 0" "$(role_of "$root" modular scripts/run.ts)"
   assert_equal "helper billing 0" "$(role_of "$root" modular src/billing/helpers.py)"
+  assert_equal "test - 0" "$(role_of "$root" modular src/user/__tests__/fixture.ts)"
 }
 
 test_layered_roles() {

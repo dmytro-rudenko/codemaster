@@ -1,5 +1,6 @@
 # File selection, roles and layout. The first input file is the flat config.
-# -v mode=filter: input paths; prints the source files of enabled languages outside ignored folders and "exclude".
+# -v mode=filter: input paths; prints the source files of enabled languages outside ignored folders and "exclude"
+#   (with -v want=styles, the style files instead).
 # -v mode=roles -v layout=<layout>: input paths; prints "path<TAB>role<TAB>entity<TAB>global<TAB>language".
 # -v mode=layout: input "folder<TAB>entry" lines of the folders in the source roots; prints the detected layout.
 # POSIX awk, together with util.awk, cfg.awk, lang.awk and roles.awk.
@@ -24,14 +25,15 @@ mode == "filter" {
   if (path == "") {
     next
   }
-  language = language_of(path)
-  if (language == "" || !(language_family(language) in enabled) || in_ignored_directory(path)) {
+  if (want == "styles") {
+    if (is_style_file(path) && !in_ignored_directory(path) && !excluded(path)) {
+      print path
+    }
     next
   }
-  for (position = 1; position <= exclude_count; position++) {
-    if (glob_match(path, exclude_glob[position])) {
-      next
-    }
+  language = language_of(path)
+  if (language == "" || !(language_family(language) in enabled) || in_ignored_directory(path) || excluded(path)) {
+    next
   }
   print path
   next
@@ -60,6 +62,15 @@ mode == "layout" {
     holds_role_file = 1
   }
   next
+}
+
+function excluded(path,    position) {
+  for (position = 1; position <= exclude_count; position++) {
+    if (glob_match(path, exclude_glob[position])) {
+      return 1
+    }
+  }
+  return 0
 }
 
 END {
