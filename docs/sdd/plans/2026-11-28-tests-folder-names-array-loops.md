@@ -391,13 +391,13 @@ test_the_plugin_has_no_errors_over_all_files() {
 **Interfaces:**
 - Produces: in check mode, `analyze.awk` prints one extra line `@functions<TAB>-<TAB><count of named functions>`. `$CM_TMP/parsed.roles` gains a 6th column with that count, and `mirror.awk` skips rows whose 6th column is `0`.
 
-- [ ] **Step 1: failing test** — `tests/mirror.test.sh`. A layered project with `src/modules/types-only.ts` (`export type Row = { id: string };`) gets no test-mirror. `src/modules/user.ts` with a function and no test gets `error test-mirror src/modules/user.ts:1`.
-- [ ] **Step 2: watch it fail** — `bash tests/run.sh mirror`.
-- [ ] **Step 3: implement:**
+- [x] **Step 1: failing test** — `tests/mirror.test.sh`. A layered project with `src/modules/types-only.ts` (`export type Row = { id: string };`) gets no test-mirror. `src/modules/user.ts` with a function and no test gets `error test-mirror src/modules/user.ts:1`.
+- [x] **Step 2: watch it fail** — `bash tests/run.sh mirror`.
+- [x] **Step 3: implement:**
   - `analyze.awk`: add a `count_named_functions()` that loops `current = 1..node_total`, skips `!is_function(current)`, calls `resolve_function_name(current)` and counts `FUNCTION_NAME != ""` (the same test `list_functions` uses). At the end of `run_checks`, print `printf "@functions\t-\t%d\t\t\n", count_named_functions()`.
   - `lib/check.sh` `cm_run_checks`: keep `functions=0` per file. In the inner loop, `if [ "$severity" = "@functions" ]; then functions="$line"; continue; fi` comes before the findings append. The parsed.roles line becomes `printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$path" "$role" "$entity" "$global" "$language" "$functions"`. `cm_scan_rules` reads `$5`, which is unaffected.
   - `lib/awk/mirror.awk`: after the strict/lenient check, `if ($6 == "0") { next }`. Update the header comment to mention the column.
-- [ ] **Step 4: watch it pass** — `bash tests/run.sh mirror`, `bash tests/run.sh acceptance functions`, `bash tests/run.sh check`, `bash tests/run.sh languages`, `bash tests/run.sh hook`: all ok.
+- [x] **Step 4: watch it pass** — `bash tests/run.sh mirror`, `bash tests/run.sh acceptance functions`, `bash tests/run.sh check`, `bash tests/run.sh languages`, `bash tests/run.sh hook`: all ok.
 
 ---
 
