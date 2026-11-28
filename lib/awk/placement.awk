@@ -9,12 +9,14 @@ $2 != "test" || $5 == "go" { next }
   if (path == location || substr(path, 1, length(location) + 1) == location "/" || path ~ /(^|\/)src\/test\//) {
     next
   }
+  count = relative_segments(path, relative)
   folder = test_folder_of(path)
   if (folder != "") {
-    printf "%s\t1\terror\ttest-placement\tsecond test folder %s; keep all tests in %s/\n", path, folder, location
+    if (count > 0 || index(folder, "/") == 0) {
+      printf "%s\t1\terror\ttest-placement\tsecond test folder %s; keep all tests in %s/\n", path, folder, location
+    }
     next
   }
-  count = relative_segments(path, relative)
   if (count > 0) {
     printf "%s\t1\terror\ttest-placement\ttest file %s belongs in %s\n", path, path, mirror_path(relative, count)
   }
