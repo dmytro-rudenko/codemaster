@@ -30,9 +30,11 @@ BEGIN {
   if (section == 1) {
     current_type[$1] = $2
     current_value[$1] = value
+    remember($1)
   } else {
     over_type[$1] = $2
     over_value[$1] = value
+    over_order[$1] = ++over_total
   }
 }
 
@@ -41,7 +43,40 @@ END {
     apply_section()
   }
   for (path in current_type) {
+    if (path != "") {
+      member_count[parent_of(path)]++
+      member[parent_of(path), member_count[parent_of(path)]] = path
+    }
+  }
+  print_tree("")
+}
+
+function remember(path) {
+  if (!(path in sequence)) {
+    sequence[path] = ++sequence_total
+  }
+}
+
+# Prints a path and its members depth first, members in the order they were first seen.
+function print_tree(path,    count, position, slot, current, list) {
+  if (path in current_type) {
     printf "%s\t%s\t%s\n", path, current_type[path], current_value[path]
+  }
+  count = member_count[path]
+  for (position = 1; position <= count; position++) {
+    list[position] = member[path, position]
+  }
+  for (position = 2; position <= count; position++) {
+    current = list[position]
+    slot = position - 1
+    while (slot > 0 && sequence[list[slot]] > sequence[current]) {
+      list[slot + 1] = list[slot]
+      slot--
+    }
+    list[slot + 1] = current
+  }
+  for (position = 1; position <= count; position++) {
+    print_tree(list[position])
   }
 }
 
@@ -107,6 +142,29 @@ function replace_subtree(path,    other) {
       current_type[other] = over_type[other]
       current_value[other] = over_value[other]
     }
+  }
+  remember_over(path)
+}
+
+# New paths take their order from the override file.
+function remember_over(path,    other, count, position, slot, current, list) {
+  count = 0
+  for (other in over_type) {
+    if (under(other, path) && !(other in sequence)) {
+      list[++count] = other
+    }
+  }
+  for (position = 2; position <= count; position++) {
+    current = list[position]
+    slot = position - 1
+    while (slot > 0 && over_order[list[slot]] > over_order[current]) {
+      list[slot + 1] = list[slot]
+      slot--
+    }
+    list[slot + 1] = current
+  }
+  for (position = 1; position <= count; position++) {
+    remember(list[position])
   }
 }
 

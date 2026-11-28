@@ -88,17 +88,17 @@ cm_run_timeout() {
   "$@" &
   pid=$!
   (
-    trap 'exit 0' TERM
-    elapsed=0
-    while [ "$elapsed" -lt "$limit" ]; do
+    sleeper=""
+    trap '[ -n "$sleeper" ] && kill "$sleeper" 2>/dev/null; exit 0' TERM
+    sleep "$limit" &
+    sleeper=$!
+    wait "$sleeper"
+    if kill -0 "$pid" 2>/dev/null; then
+      : > "$CM_TMP/timeout.$pid"
+      kill -TERM "$pid" 2>/dev/null
       sleep 1
-      elapsed=$((elapsed + 1))
-      kill -0 "$pid" 2>/dev/null || exit 0
-    done
-    kill -TERM "$pid" 2>/dev/null
-    sleep 1
-    kill -KILL "$pid" 2>/dev/null
-    : > "$CM_TMP/timeout.$pid"
+      kill -KILL "$pid" 2>/dev/null
+    fi
   ) >/dev/null 2>&1 &
   watcher=$!
   wait "$pid"
