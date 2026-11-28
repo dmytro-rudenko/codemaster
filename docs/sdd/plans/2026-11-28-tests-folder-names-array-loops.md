@@ -3,7 +3,7 @@
 **Goal:** codemaster keeps every test in one `tests/` folder (`test-placement`), asks for tests only for files with functions, flags `*.consts.*` / `*.interfaces.*` / `*.styles.css` names (`file-name-suffix`), flags long arrays of same-shaped elements (`array-repeated-elements`) and if-return chains (`lookup-chain`), has default limits of 4 for nesting and name words, and its own awk code uses lookup tables instead of if-chains.
 **Spec:** docs/sdd/specs/2026-11-28-tests-folder-names-array-loops.md (sections 3.6 `lookup-chain` and 3.7 awk refactor are added by Task 7, from this plan)
 **Verification:** `bash tests/run.sh`, last line `<N> passed, 0 failed, 0 skipped`.
-**Before Wave 0 (user asked):** run `bash <pasadena hooks>/ub-tools.sh install`, then `ub-tools.sh dryer lib tests`; add every pair ≥ 0.8 that touches a task's files to that task as "reuse or merge <file:lines> and <file:lines>". If dryer can't read bash/awk, note `dryer: no supported files` here and continue.
+**dryer:** no duplicate candidates (bash/awk unsupported; unchecked: 2 JS files).
 
 ## Global constraints
 - Stack: bash 3.2-compatible scripts, POSIX awk run with `LC_ALL=C` (`cm_awk`), ast-grep tree dumps. Tests: `tests/*.test.sh`, functions `test_*`, helpers in `tests/lib.sh` (`run_in`, `copy_fixture`, `triples`, `assert_*`, `$TEST_TMP`).
