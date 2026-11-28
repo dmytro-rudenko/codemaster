@@ -26,9 +26,9 @@ test_hooks_run_the_bash_cli() {
 
 test_skills_carry_their_names_and_versions() {
   assert_match '^name: codemaster$' "$(frontmatter skills/codemaster/SKILL.md)"
-  assert_match '^version: 0\.2\.0$' "$(frontmatter skills/codemaster/SKILL.md)"
+  assert_match '^version: 0\.2\.1$' "$(frontmatter skills/codemaster/SKILL.md)"
   assert_match '^name: codemaster-audit$' "$(frontmatter skills/codemaster-audit/SKILL.md)"
-  assert_match '^version: 0\.2\.0$' "$(frontmatter skills/codemaster-audit/SKILL.md)"
+  assert_match '^version: 0\.2\.1$' "$(frontmatter skills/codemaster-audit/SKILL.md)"
 }
 
 test_readme_in_english_with_an_install_section() {
