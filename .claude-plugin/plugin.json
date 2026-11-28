@@ -1,6 +1,6 @@
 {
   "name": "codemaster",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Code-organisation rules for TypeScript, JavaScript, Python, Go, Rust, Java, Kotlin, C#, PHP, Ruby, C and C++: a Stop hook runs deterministic checks (layout, names, parameters, nesting), a three-variant function tournament and a library digest, and the codemaster skill fixes what they find while following the project's own conventions first. Written in bash: it needs only bash, git and the standard POSIX tools, and fetches ast-grep by itself on first use.",
   "hooks": "./hooks/hooks.json",
   "author": {

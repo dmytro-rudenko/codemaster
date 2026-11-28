@@ -32,21 +32,25 @@ claude --plugin-dir <path>
   | `layout-forbidden-declaration` | no interfaces, types, enums or constants in modules, helpers and utils |
   | `single-file-module-size` | a single-file module with its own declarations grows past `singleFileMaxLines` |
   | `helpers-only-functions` | helpers and utils hold only functions |
-  | `test-mirror` | every module, helper and util has a test file, named the way the language names tests |
+  | `test-mirror` | every module, helper and util **with a function** has a test file in `tests/`, named the way the language names tests |
+  | `test-placement` | all tests live in the one tests folder (`testsLocation`, default `tests/`), mirroring the source tree; none next to the code, no second test folder (Go and JVM `src/test/` are exempt) |
   | `helpers-mixed-kind` | a helper mixes database and network work |
   | `name-abbreviation` | no abbreviations such as `cfg`, `msg`, `req` |
-  | `name-word-count` | a name has at most 3 words |
+  | `name-word-count` | a name has at most 4 words |
   | `name-entity-prefix` | constants and interfaces carry the entity prefix (`USER_`, `User`) |
+  | `file-name-suffix` | `user/consts.ts`, not `user.consts.ts`; `button.css`, not `button.styles.css` or `button.module.css` |
   | `max-params` | at most 5 parameters |
-  | `max-nesting` | at most 3 levels of blocks, no callback hell |
+  | `max-nesting` | at most 4 levels of blocks, no callback hell |
   | `max-call-nesting` | no `a(b(c(d())))` |
   | `global-function` | top-level functions only in modules, helpers and utils |
   | `prefer-destructuring` | `const { name } = user` instead of `const name = user.name` (TypeScript and JavaScript) |
+  | `array-repeated-elements` | no array of 4 or more elements of the same shape; build it with a `for` loop (TypeScript, JavaScript, Python) |
+  | `lookup-chain` | no chain of 4 or more `if (x == literal) return literal`; use a lookup table (TypeScript, JavaScript, Python) |
   | `simple-package` | no `axios`-like packages for what `fetch` does (`package.json`) |
 
 - **Function tournament.** For a changed function that is complex enough, Claude writes three variants (`first`, `readable`, `optimized`) and test cases. The runner of the language (Node for TypeScript and JavaScript, Python, Ruby, PHP, Go) drops the variants that fail a case and scores the rest by cognitive complexity, length, bytecode (V8, CPython or YARV), speed and closeness to what the runtime executes. The winner goes into the code.
 - **Library digest.** For each npm dependency Claude writes a short summary into `.claude/skills/codemaster-libraries/`, so that later sessions check what an installed library already does before writing the same code.
-- **Coverage.** The `codemaster` skill brings line coverage of the changed modules to 100%.
+- **Coverage.** The `codemaster` skill brings line coverage of the changed modules to 100% of the lines of functions.
 - **Audit.** `/codemaster:codemaster-audit [path]` runs the checks over the existing code and fixes it one entity per batch, with a commit for each.
 
 ### Languages
@@ -67,7 +71,7 @@ For the languages whose tests usually live in their own tree (Python, Java, Kotl
 
 ## Configuration
 
-`.codemaster.json` in the project root is optional. Without it, the first hook run scans the project and writes the profile (the `sourceRoot`, the folder names of each role, the test location and suffix, the naming conventions, and the limits found in a Biome config). The hook never runs the project's own ESLint, because that would execute repository code; run `conventions --refresh` yourself to import ESLint limits. Each written field has its source in `sources`: a config path, `dominant 83% (41/49)` or `default`. The profile is printed at the top of the first report; correct the file if something is wrong. A field written by hand is never overwritten.
+`.codemaster.json` in the project root is optional. Without it, the first hook run scans the project and writes the profile (the `sourceRoot`, the folder names of each role, the tests folder and test suffix, the naming conventions, and the limits found in a Biome config). The hook never runs the project's own ESLint, because that would execute repository code; run `conventions --refresh` yourself to import ESLint limits. Each written field has its source in `sources`: a config path, `dominant 83% (41/49)` or `default`. The profile is printed at the top of the first report; correct the file if something is wrong. A field written by hand is never overwritten.
 
 ```json
 {
@@ -82,6 +86,8 @@ For the languages whose tests usually live in their own tree (Python, Java, Kotl
   }
 }
 ```
+
+`testsLocation` is always a folder name, `tests` by default. The old value `"colocated"` is not supported: it gives one line `warning config testsLocation: "colocated" is not supported, using "tests"` and works as `tests`.
 
 `.codemaster.local.json` next to it has the same format and overrides `.codemaster.json` for one developer. Add it to `.gitignore`.
 

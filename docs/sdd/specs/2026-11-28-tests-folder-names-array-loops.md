@@ -68,6 +68,19 @@
 - Значення з `rules.<id>.max` проєкту й імпорт з ESLint/Biome (3.2a) і далі мають пріоритет.
 - Оновити `README.md` і `skills/codemaster/references/rules.md` (приклади: `getActiveUserOrderTotalPrice` — 5 слів, і далі порушення).
 
+### 3.6. Ланцюги `if` над літералами: таблиця замість розгалужень
+
+- **Новий `lookup-chain`** (warning), TypeScript, TSX, JavaScript і Python (решта мов мовчить, як у 3.3). Порушення: понад `max` (типово `3`, тобто 4+) поспіль `if`-гілок — сусідніх `if` або ланцюга `else if` / `elif` — де умова порівнює одне й те саме ім'я з літералами (`==` / `===`, кілька літералів через `||` / `or`), а тіло гілки — лише `return <літерал>`. Ланцюг `else if` рахується так само, як сусідні `if`.
+- Не перевіряються файли з роллю `consts`, `interfaces` і `test`.
+- `rules.lookup-chain.max` змінює поріг; `"off"` вимикає.
+- Повідомлення: `<N> if branches compare <name> with literals; use a lookup table`.
+- **Скіл** (`skills/codemaster/SKILL.md`, «Rules while coding», і `references/rules.md`): ланцюг `if (x == літерал) return літерал` замінювати таблицею (об'єкт, map, масив).
+
+### 3.7. Власний awk codemaster: таблиці замість ланцюгів `if`
+
+- `lib/awk/lang.awk` (`language_of`, `language_extensions`) і `lib/awk/mirror.awk` (`default_test_name`, `test_names`) беруть значення з таблиць, які заповнюються один раз у циклі, а не з ланцюгів `if (x == літерал) return літерал`. Сигнатури й повернені значення функцій не змінюються.
+- Awk codemaster не перевіряє (мови awk немає серед підтримуваних), тому цю вимогу охороняє тест `test_codemaster_awk_uses_lookup_tables`.
+
 ### Public interface
 
 | Що | Значення | Фраза користувача |
@@ -79,6 +92,8 @@
 | `test-mirror` | лише файли з функціями | «тести для interfaces/consts не пишуться. Тільки для функцій» |
 | `max-nesting` | типовий `max` 4 | «вкладеністю за замовчуванням до 4» |
 | `name-word-count` | типовий `max` 4 | «називати змінні та інші чотирма словами за замовчуванням» |
+| rule `lookup-chain` | warning, `max` типово 3 | «Оце можна було написать через массив» |
+| awk codemaster (`lang.awk`, `mirror.awk`) | таблиці пошуку замість ланцюгів `if` | «Оце можна було написать через массив» |
 
 Альтернативні прочитання, які спек відкидає: «вкладеність до 4» як межа колбеків (відкинуто: йдеться про `max-nesting` блоків; колбеки лишаються 2); «тека на кожен модуль» як типова (відкинуто обраним варіантом: одна `tests/` у корені); «без суфікса» як `consts/user.ts` у modular (відкинуто: ім'я `consts.ts` у теці сутності).
 
@@ -104,5 +119,7 @@
 - `array-repeated-elements`: масив з 4 однакових JSX-елементів, масив з 4 об'єктів однакової форми, `[1,2,3,4,5]` → по одному warning; масив із 4 рядків-літералів, масив у `consts/`, масив у тесті, 3 однакових елементи → тиша; `rules.array-repeated-elements: "off"` → тиша.
 - `conventions` на фікстурі з поруч розташованими тестами: `testsLocation` — `tests`, джерело `default`; `testsLocation: "colocated"` у конфігу → рядок `warning config` і поведінка `tests`.
 - `test-mirror`: `module` лише з `interface` і класом без методів → без знахідки; `module` з однією функцією без тесту → error; файли `consts`/`interfaces` → без знахідки.
+- `lookup-chain`: ланцюг `else if` з 4 гілок `return <літерал>` над одним іменем і 4 сусідні `if` → по одному warning; 3 гілки, 4 гілки над двома різними іменами, 4 гілки з викликом у тілі, файл у ролі `consts`, `rules.lookup-chain: "off"` → тиша.
+- Awk codemaster: `test_codemaster_awk_uses_lookup_tables` зелений; `languages`, `check`, `roles`, `portability` дають ті самі знахідки, що й до рефакторингу.
 - `max-nesting`: функція з 4 рівнями блоків → тиша, з 5 → error; `name-word-count`: ім'я з 4 слів → тиша, з 5 → warning; `rules.max-nesting.max: 3` повертає стару межу.
 - Власний репозиторій: `bash bin/codemaster check --all` не додає нових error.

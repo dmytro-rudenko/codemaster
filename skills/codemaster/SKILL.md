@@ -1,6 +1,6 @@
 ---
 name: codemaster
-version: 0.2.0
+version: 0.3.0
 description: Use while writing or changing code in this project and whenever the codemaster Stop hook asks for it. Applies the code-organisation rules (layout, names, parameters, nesting, destructuring, KISS) after the project's own conventions, runs the codemaster checks, the function tournament, coverage and the library digest, and fixes what they find.
 ---
 
@@ -22,7 +22,7 @@ Never rename existing folders to match codemaster names. If the project calls a 
 
 ## Rules while coding
 
-These rules are not checked by a script. Follow them in every change.
+These rules are not all checked by a script. Follow them in every change.
 
 - KISS. Pick the simplest code that works.
 - Before a task, check whether the framework or an installed library already does it. Read `.claude/skills/codemaster-libraries/SKILL.md` when it exists.
@@ -30,6 +30,11 @@ These rules are not checked by a script. Follow them in every change.
 - Keep call nesting low and avoid callback hell: use async/await (or the language's equivalent) and early returns.
 - Use destructuring (unpacking, pattern matching) where the language has it and it fits.
 - Use full names, and two words where two are enough.
+- All tests live in the one tests folder (`testsLocation`, default `tests/`) mirroring the source tree; never next to the code, never a second test folder.
+- Write tests only for functions; constants, interfaces and types get none.
+- Name constants, interfaces and stylesheet files by role only: `user/consts.ts`, `user/interfaces.ts`, `button/button.css`, never `user.consts.ts`, `button.styles.css`, `button.module.css`.
+- Build repeated elements with a loop (`for`/`for…of`, or `map` over a data array in JSX), not a long literal array, including list items, rows and icons in components.
+- Replace a chain of `if (x == literal) return literal` with a lookup table (object, map, array).
 - On the frontend use a component approach and MVC, unless the project sets another structure.
 - Split helpers into `infrastructure` (database, redis, internal tools), `external` (third-party APIs) and `logic` (pure functions). This is a recommendation for projects that have no helper layout of their own.
 
@@ -53,7 +58,7 @@ The hook blocks with a report that starts with `Run the codemaster skill (codema
    - A function that cannot be isolated (closure over module state, path aliases) is skipped: `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" tournament --skip <file>#<name> --reason "<text>"`. Name every skipped function in the final report.
    - List the open candidates at any time with `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" tournament --candidates`.
 4. Libraries. For every `add` and `stale` line of the report, write the library summary as described in `references/libraries.md`. Run `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" libraries` to see the full list, and `bash "${CLAUDE_PLUGIN_ROOT}/bin/codemaster" libraries --prune --index` after the files are written. It deletes the `remove` files and rebuilds the index.
-5. Coverage. Run the project's tests with coverage and bring line coverage of the changed files with the roles `module` and `single-file-module` to 100%, adding tests to their mirror test files. The command is, in this order:
+5. Coverage. Run the project's tests with coverage and bring line coverage of the changed files with the roles `module` and `single-file-module` to 100% of the lines of functions, adding tests to their mirror test files. The command is, in this order:
    1. `coverageCommand` from `.codemaster.json` — it comes from the repository, so show the exact command to the user and run it only after they approve it in this session;
    2. the coverage command of the project's own test setup, as its manifest declares it: `npx vitest run --coverage` when `package.json` lists `vitest`, `npx jest --coverage` when it lists `jest`, `node --test --experimental-test-coverage` for other Node projects; `pytest --cov` (or `coverage run -m pytest`) for Python; `go test -cover ./...` for Go; `cargo llvm-cov` or `cargo tarpaulin` for Rust when installed; the JaCoCo task of Maven or Gradle for Java and Kotlin; `dotnet test --collect:"XPlat Code Coverage"` for C#; `phpunit --coverage-text` for PHP; SimpleCov through the test suite for Ruby; `gcov`/`llvm-cov` through the build for C and C++;
    3. when the project has no coverage tool, say so in the report instead of installing one.
