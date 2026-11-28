@@ -377,7 +377,7 @@ test_the_plugin_has_no_errors_over_all_files() {
     }
     ```
     In `cm_run_checks`, right after `cm_roles < "$files" > "$CM_TMP/roles"`: `cm_check_placement < "$CM_TMP/roles" >> "$CM_TMP/findings.raw"`. This runs for every layout and comes after the `: > findings.raw` line, so move that truncation above it.
-- [ ] **Step 4: watch them pass** — `bash tests/run.sh placement`, `bash tests/run.sh roles`, `bash tests/run.sh acceptance placement`, `bash tests/run.sh acceptance go_tests`, `bash tests/run.sh check`, `bash tests/run.sh languages`: all ok.
+- [ ] **Step 4: watch them pass** — `bash tests/run.sh placement`, `bash tests/run.sh roles`, `bash tests/run.sh acceptance misplaced`, `bash tests/run.sh acceptance go_tests`, `bash tests/run.sh check`, `bash tests/run.sh languages`: all ok.
 
 ---
 

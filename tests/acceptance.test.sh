@@ -105,6 +105,7 @@ test_repeated_array_elements_ask_for_a_loop() {
   assert_match '^warning array-repeated-elements src/order/order\.ts:2 array has 4 elements of the same shape; build it with a for loop$' "$OUTPUT"
   assert_match '^warning array-repeated-elements src/page/page\.ts:2 array has 5 elements of the same shape; build it with a for loop$' "$OUTPUT"
   assert_match '^warning array-repeated-elements src/report/report\.py:2 array has 4 elements of the same shape; build it with a for loop$' "$OUTPUT"
+  assert_equal 4 "$(printf '%s\n' "$OUTPUT" | grep -c ' array-repeated-elements ')"
 }
 
 test_plain_data_arrays_stay_quiet() {
@@ -133,10 +134,18 @@ test_if_chains_over_literals_ask_for_a_lookup_table() {
   assert_no_match 'lookup-chain src/kind/three\.ts' "$OUTPUT"
 }
 
+# Counts lines matching a pattern inside the named awk functions of a file.
+chain_lines() {
+  awk -v names=" $3 " -v pattern="$2" '
+    /^function / { name = $2; sub(/\(.*/, "", name); inside = index(names, " " name " ") > 0 }
+    inside && index($0, pattern) > 0 { count++ }
+    END { print count + 0 }' "$1"
+}
+
 test_codemaster_awk_uses_lookup_tables() {
-  assert_equal 0 "$(grep -c 'if (language == "' "$PLUGIN_ROOT/lib/awk/lang.awk")"
-  assert_equal 0 "$(grep -c 'if (language == "' "$PLUGIN_ROOT/lib/awk/mirror.awk")"
-  assert_equal 0 "$(grep -c 'if (extension == "' "$PLUGIN_ROOT/lib/awk/lang.awk")"
+  assert_equal 0 "$(chain_lines "$PLUGIN_ROOT/lib/awk/lang.awk" 'if (extension == "' 'language_of')"
+  assert_equal 0 "$(chain_lines "$PLUGIN_ROOT/lib/awk/lang.awk" 'if (language == "' 'language_extensions')"
+  assert_equal 0 "$(chain_lines "$PLUGIN_ROOT/lib/awk/mirror.awk" 'if (language == "' 'default_test_name test_names')"
 }
 
 test_conventions_never_record_colocated_tests() {
@@ -163,7 +172,7 @@ test_colocated_in_the_config_warns_and_means_tests() {
 test_tests_are_required_only_for_files_with_functions() {
   local directory
   directory=$(new_project "$MODULAR")
-  put "$directory/src/user/model.ts" 'export class UserRecord { name = "x"; }\n'
+  put "$directory/src/user/model.ts" 'export interface UserShape { name: string }\nexport class UserRecord { name = "x"; }\n'
   put "$directory/src/user/service.ts" "$USER_SERVICE"
   put "$directory/src/user/consts.ts" 'export const USER_LIMIT = 1;\n'
   put "$directory/src/user/interfaces.ts" 'export interface UserAccount { name: string }\n'
