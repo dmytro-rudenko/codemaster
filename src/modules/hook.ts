@@ -18,7 +18,7 @@ import type { ConfigProject } from "../interfaces/config.ts";
 import type { FindingItem, FindingSummary } from "../interfaces/finding.ts";
 import type { HookStopInput } from "../interfaces/hook.ts";
 import { readJsonFile, readTextFile, writeTextFile } from "../helpers/infrastructure/filesystem.ts";
-import { isPackageManifestChanged, isRepository, listChangedFiles, resolveStateDirectory } from "../helpers/infrastructure/git.ts";
+import { isRepository, listChangedManifests, listChangedFiles, resolveStateDirectory } from "../helpers/infrastructure/git.ts";
 import { detectLayout } from "../helpers/logic/file-role.ts";
 import { hashText } from "../utils/hash.ts";
 import { runChecks } from "./check.ts";
@@ -153,23 +153,26 @@ function writeDeferredFiles(projectRoot: string, deferred: string[]): void {
 function findPending(projectRoot: string): {
   statePath: string;
   changed: string[];
+  manifests: string[];
   pending: string[];
   current: Map<string, string>;
   recorded: Map<string, string>;
 } | null {
   const changed = listChangedFiles(projectRoot);
-  const current = new Map([...changed, HOOK_MANIFEST_FILE].map((path) => [path, hashText(readTextFile(join(projectRoot, path)) ?? "")]));
+  const changedManifests = listChangedManifests(projectRoot);
+  const manifests = [...new Set([HOOK_MANIFEST_FILE, ...changedManifests])];
+  const current = new Map([...changed, ...manifests].map((path) => [path, hashText(readTextFile(join(projectRoot, path)) ?? "")]));
   const statePath = join(resolveStateDirectory(projectRoot), HOOK_STATE_FILE);
   const recorded = readCheckedFiles(statePath);
   const pending = changed.filter((path) => recorded.get(path) !== current.get(path));
-  const manifestPending = recorded.get(HOOK_MANIFEST_FILE) !== current.get(HOOK_MANIFEST_FILE) && isPackageManifestChanged(projectRoot);
-  return pending.length === 0 && !manifestPending ? null : { statePath, changed, pending, current, recorded };
+  const manifestPending = changedManifests.some((path) => recorded.get(path) !== current.get(path));
+  return pending.length === 0 && !manifestPending ? null : { statePath, changed, manifests, pending, current, recorded };
 }
 
 function recordChecked(state: NonNullable<ReturnType<typeof findPending>>, checked: string[]): void {
-  const { statePath, changed, current, recorded } = state;
+  const { statePath, changed, manifests, current, recorded } = state;
   const next = new Map([...recorded].filter(([path]) => changed.includes(path)));
-  for (const path of [...checked, HOOK_MANIFEST_FILE]) {
+  for (const path of [...checked, ...manifests]) {
     next.set(path, current.get(path) as string);
   }
   const sorted = [...next].sort(([left], [right]) => left.localeCompare(right));

@@ -7,8 +7,8 @@ import { basename, dirname, isAbsolute, join } from "node:path";
 import {
   findBaseBranch,
   findMergeBase,
-  isPackageManifestChanged,
   isRepository,
+  listChangedManifests,
   listAllSourceFiles,
   listChangedFiles,
   listChangedLineRanges,
@@ -129,13 +129,15 @@ test("listAllSourceFiles includes tracked and untracked sources with the same fi
   }
 });
 
-test("isPackageManifestChanged becomes true after editing a committed package.json", () => {
+test("listChangedManifests lists every edited package.json outside node_modules", () => {
   const directory = createRepository();
   try {
     runGit(directory, ["checkout", "-q", "-b", "work"]);
-    assert.equal(isPackageManifestChanged(directory), false);
+    assert.deepEqual(listChangedManifests(directory), []);
     writeProjectFile(directory, "package.json", '{"name":"sample","version":"1.1.0"}\n');
-    assert.equal(isPackageManifestChanged(directory), true);
+    writeProjectFile(directory, "front/package.json", "{}\n");
+    writeProjectFile(directory, "front/node_modules/x/package.json", "{}\n");
+    assert.deepEqual(listChangedManifests(directory), ["front/package.json", "package.json"]);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

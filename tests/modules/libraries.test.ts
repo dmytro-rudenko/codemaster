@@ -327,7 +327,7 @@ function createContext(directory: string, argumentsList: string[], overrides: Pa
 
 async function runCaptured(context: CommandContext): Promise<{ status: number; stdout: string; stderr: string }> {
   const writeOut = process.stdout.write;
-  const writeErr = process.stderr.write;
+  const writeError = process.stderr.write;
   let stdout = "";
   let stderr = "";
   process.stdout.write = ((chunk: string | Uint8Array) => {
@@ -343,7 +343,7 @@ async function runCaptured(context: CommandContext): Promise<{ status: number; s
     return { status, stdout, stderr };
   } finally {
     process.stdout.write = writeOut;
-    process.stderr.write = writeErr;
+    process.stderr.write = writeError;
   }
 }
 
@@ -676,6 +676,59 @@ test("prune keeps a hand-written file and deletes an undeclared summary with fro
     assert.equal(existsSync(join(directory, summaryDirectory, "alpha.md")), true);
     assert.ok(result.stdout.split("\n").includes("remove zeta"), result.stdout);
     assert.doesNotMatch(result.stdout, /team-notes/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("dependencies of a subfolder manifest are read and found in that subfolder's node_modules", () => {
+  const diff = runDiff({
+    dependencies: { alpha: "1.0.0" },
+    installed: { alpha: { version: "1.0.0" } },
+    files: {
+      "front/package.json": JSON.stringify({ dependencies: { vue: "3.0.0", alpha: "1.0.0" } }),
+      "front/node_modules/vue/package.json": JSON.stringify({ name: "vue", version: "3.4.0" }),
+      "front/node_modules/vue/README.md": "# vue\n",
+      "front/node_modules/inner/package.json": JSON.stringify({ dependencies: { ghost: "1.0.0" } }),
+      "back/package.json": JSON.stringify({ dependencies: { beta: "2.0.0" } }),
+    },
+  });
+  assert.deepEqual(
+    diff.add.map(({ name, version, readme }) => `${name} ${version} ${readme}`),
+    ["alpha 1.0.0 null", "vue 3.4.0 front/node_modules/vue/README.md"],
+  );
+  assert.deepEqual(diff.missing, ["beta"]);
+});
+
+test("a package declared only in a subfolder is not listed for removal", () => {
+  const diff = runDiff({
+    files: { "front/package.json": JSON.stringify({ dependencies: { vue: "3.0.0" } }) },
+    summaries: { "vue.md": summaryText("vue", "3.0.0"), "lodash.md": summaryText("lodash", "4.0.0") },
+  });
+  assert.deepEqual(diff.remove, ["lodash"]);
+});
+
+test("an unparsable subfolder manifest is named in the warning and nothing is pruned", async () => {
+  const directory = createProject({
+    files: { "front/package.json": "{" },
+    summaries: { "lodash.md": summaryText("lodash", "4.0.0") },
+  });
+  try {
+    const result = await runCaptured(createContext(directory, ["--prune"]));
+    assert.equal(result.status, 1);
+    assert.equal(result.stderr, "warning libraries front/package.json: invalid JSON; nothing pruned\n");
+    assert.equal(existsSync(join(directory, summaryDirectory, "lodash.md")), true);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("a project with manifests only in subfolders is not missing a package.json", async () => {
+  const directory = createProject({ files: { "front/package.json": JSON.stringify({ dependencies: {} }) } });
+  try {
+    rmSync(join(directory, "package.json"));
+    const result = await runCaptured(createContext(directory, []));
+    assert.equal(result.stderr, "");
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

@@ -43,7 +43,7 @@ Examples use the `layered` layout (`src/modules`, `src/consts`, `src/interfaces`
 - `max-call-nesting`: a call used as an argument of a call, deeper than 3 levels.
 - `global-function`: a top-level function in a file whose role is not `module`, `single-file-module`, `helper`, `util` or `test`; the exception is `main` in an `entrypoint`. Assignments to `globalThis`, `window`, `global` and `declare global` with a function are also errors.
 - `prefer-destructuring`: `const $X = $OBJ.$X` and `const $X = $OBJ["$X"]`.
-- `simple-package`: `dependencies` or `devDependencies` in `package.json` lists a package from `simplePackages`.
+- `simple-package`: `dependencies` or `devDependencies` of any `package.json` in the project lists a package from `simplePackages`. Manifests are found the same way as for the library digest: every subfolder except `node_modules`, `.git`, nested git repositories and `exclude`.
 
 Rules that depend on layout (`layout-forbidden-declaration`, `helpers-only-functions`, `test-mirror`, `helpers-mixed-kind`, `name-entity-prefix`, `single-file-module-size`) do not apply when the layout is `off`.
 

@@ -1,14 +1,15 @@
 import { existsSync, lstatSync, readdirSync, realpathSync } from "node:fs";
-import { join, sep } from "node:path";
+import { join, posix, sep } from "node:path";
 import type { CommandContext } from "../interfaces/command.ts";
 import type { ConfigProject } from "../interfaces/config.ts";
 import type { LibraryDiff, LibraryEntry, LibraryStale } from "../interfaces/library.ts";
 import { readJsonFile, readTextFile, removeFile, writeTextFile } from "../helpers/infrastructure/filesystem.ts";
+import { listManifests } from "../helpers/infrastructure/manifest.ts";
+import { MANIFEST_FILE } from "../consts/manifest.ts";
 import {
   LIBRARIES_GUARDED_PATHS,
   LIBRARIES_INDEX_FILE,
   LIBRARIES_INDEX_HEADER,
-  LIBRARIES_MANIFEST_FILE,
   LIBRARIES_MANIFEST_INVALID,
   LIBRARIES_MANIFEST_MISSING,
   LIBRARIES_NAME_PATTERN,
@@ -44,43 +45,78 @@ function readSummaries(
     });
 }
 
-function findManifestProblem(projectRoot: string): string | null {
-  const path = join(projectRoot, LIBRARIES_MANIFEST_FILE);
-  const { value, error } = readJsonFile(path);
-  if (error === null && typeof value === "object" && value !== null && !Array.isArray(value)) {
-    return null;
+function findManifestProblem(projectRoot: string, config: ConfigProject): string | null {
+  const manifests = listManifests(projectRoot, config.exclude);
+  if (manifests.length === 0) {
+    return `${MANIFEST_FILE}: ${LIBRARIES_MANIFEST_MISSING}`;
   }
-  return existsSync(path) ? LIBRARIES_MANIFEST_INVALID : LIBRARIES_MANIFEST_MISSING;
+  const invalid = manifests.find((file) => {
+    const { value, error } = readJsonFile(join(projectRoot, file));
+    return error !== null || typeof value !== "object" || value === null || Array.isArray(value);
+  });
+  return invalid === undefined ? null : `${invalid}: ${LIBRARIES_MANIFEST_INVALID}`;
 }
 
-function readDeclared(projectRoot: string, config: ConfigProject): string[] {
-  const { value } = readJsonFile(join(projectRoot, "package.json"));
-  const manifest = (value ?? {}) as Record<string, Record<string, string> | undefined>;
-  const groups = [manifest.dependencies, config.libraryDigestDev ? manifest.devDependencies : undefined];
-  const names = new Set(groups.flatMap((group) => Object.keys(group ?? {})));
-  return [...names].filter((name) => !name.startsWith(LIBRARIES_TYPES_PREFIX)).sort();
+function listDependencyNames(manifest: unknown, includeDev: boolean): string[] {
+  const { dependencies, devDependencies } = (manifest ?? {}) as Record<string, unknown>;
+  const groups = includeDev ? [dependencies, devDependencies] : [dependencies];
+  return groups
+    .flatMap((group) => (typeof group === "object" && group !== null ? Object.keys(group) : []))
+    .filter((name) => !name.startsWith(LIBRARIES_TYPES_PREFIX));
 }
 
-function readInstalled(projectRoot: string, name: string): LibraryEntry | null {
-  if (!LIBRARIES_NAME_PATTERN.test(name)) {
-    return null;
+function readDeclared(projectRoot: string, config: ConfigProject): Map<string, string[]> {
+  const declared = new Map<string, string[]>();
+  for (const file of listManifests(projectRoot, config.exclude)) {
+    const { value } = readJsonFile(join(projectRoot, file));
+    for (const name of listDependencyNames(value, config.libraryDigestDev)) {
+      declared.set(name, [...(declared.get(name) ?? []), posix.dirname(file)]);
+    }
   }
-  const directory = join(projectRoot, "node_modules", name);
-  const { value, error } = readJsonFile(join(directory, "package.json"));
+  return new Map([...declared].sort(([left], [right]) => (left < right ? -1 : 1)));
+}
+
+function listAncestors(directories: string[]): string[] {
+  const found = directories.flatMap((directory) => {
+    const chain: string[] = [];
+    for (let current = directory; current !== "."; current = posix.dirname(current)) {
+      chain.push(current);
+    }
+    return [...chain, "."];
+  });
+  return [...new Set(found)];
+}
+
+function readEntry(projectRoot: string, name: string, relativeDirectory: string): LibraryEntry | null {
+  const directory = join(projectRoot, relativeDirectory);
+  const { value, error } = readJsonFile(join(directory, MANIFEST_FILE));
   if (error !== null) {
     return null;
   }
   const { version = "", homepage = null } = (value ?? {}) as { version?: string; homepage?: string };
   const readmeName = LIBRARIES_README_NAMES.find((fileName) => existsSync(join(directory, fileName)));
-  const readme = readmeName === undefined ? null : `node_modules/${name}/${readmeName}`;
-  return { name, version, readme, homepage };
+  return { name, version, readme: readmeName === undefined ? null : `${relativeDirectory}/${readmeName}`, homepage };
+}
+
+function readInstalled(projectRoot: string, name: string, directories: string[]): LibraryEntry | null {
+  if (!LIBRARIES_NAME_PATTERN.test(name)) {
+    return null;
+  }
+  const bases = listAncestors(directories).map((base) => posix.join(base, "node_modules", name));
+  for (const relativeDirectory of bases) {
+    const entry = readEntry(projectRoot, name, relativeDirectory);
+    if (entry !== null) {
+      return entry;
+    }
+  }
+  return null;
 }
 
 function findOrphans(projectRoot: string, config: ConfigProject): ReturnType<typeof readSummaries> {
-  if (findManifestProblem(projectRoot) !== null) {
+  if (findManifestProblem(projectRoot, config) !== null) {
     return [];
   }
-  const declaredFiles = new Set(readDeclared(projectRoot, config).map(fileNameFor));
+  const declaredFiles = new Set([...readDeclared(projectRoot, config).keys()].map(fileNameFor));
   return readSummaries(projectRoot).filter(({ fileName, managed }) => managed && !declaredFiles.has(fileName));
 }
 
@@ -92,8 +128,8 @@ export function diffLibraries(input: { projectRoot: string; config: ConfigProjec
   const remove = findOrphans(projectRoot, config).map(({ name }) => name).sort();
   const missing: string[] = [];
   const pending: Array<LibraryEntry | LibraryStale> = [];
-  for (const name of declared) {
-    const installed = readInstalled(projectRoot, name);
+  for (const [name, directories] of declared) {
+    const installed = readInstalled(projectRoot, name, directories);
     const summary = summaryByFile.get(fileNameFor(name));
     if (installed === null) {
       missing.push(name);
@@ -160,9 +196,9 @@ export async function runCommand(context: CommandContext): Promise<number> {
   }
   const prune = argumentsList.includes("--prune");
   const index = argumentsList.includes("--index");
-  const problem = findManifestProblem(projectRoot);
+  const problem = findManifestProblem(projectRoot, config);
   if (problem !== null) {
-    process.stderr.write(`warning libraries ${LIBRARIES_MANIFEST_FILE}: ${problem}; nothing pruned\n`);
+    process.stderr.write(`warning libraries ${problem}; nothing pruned\n`);
     if (prune) {
       return 1;
     }

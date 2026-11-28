@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
 import { CHECK_IGNORED_DIRECTORIES, CHECK_SOURCE_EXTENSIONS } from "../../consts/check.ts";
+import { MANIFEST_FILE, MANIFEST_SKIPPED_DIRECTORIES } from "../../consts/manifest.ts";
 import { runProcess } from "./process.ts";
 
 function runGit(directory: string, gitArguments: string[]): string | null {
@@ -88,8 +89,11 @@ export function listChangedLineRanges(directory: string, file: string): Array<{ 
   return ranges;
 }
 
-export function isPackageManifestChanged(directory: string): boolean {
-  return listChangedPaths(directory).some((path) => basename(path) === "package.json");
+export function listChangedManifests(directory: string): string[] {
+  const manifests = listChangedPaths(directory).filter(
+    (path) => basename(path) === MANIFEST_FILE && !path.split("/").some((segment) => MANIFEST_SKIPPED_DIRECTORIES.includes(segment)),
+  );
+  return [...new Set(manifests)].sort();
 }
 
 export function resolveStateDirectory(directory: string): string {
