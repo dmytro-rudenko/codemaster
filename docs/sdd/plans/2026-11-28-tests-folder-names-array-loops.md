@@ -290,8 +290,8 @@ test_the_plugin_has_no_errors_over_all_files() {
 **Complexity:** routine
 **Satisfies:** `test_nesting_and_name_limits_default_to_four`
 
-- [ ] **Step 1: watch it fail** — `bash tests/run.sh acceptance limits_default`.
-- [ ] **Step 2: implement:**
+- [x] **Step 1: watch it fail** — `bash tests/run.sh acceptance limits_default`.
+- [x] **Step 2: implement:**
   - `lib/awk/analyze.awk`: `rule_limit("name-word-count", 3)` → `4`, `rule_limit("max-nesting", 3)` → `4`. The callback limit (2) and `max-call-nesting` (3) stay.
   - Keep each nesting fixture failing at five levels. In every file of the polyglot list, take the `max-nesting` line L from `polyglot.expected`: line L opens the 4th-level block and line L+1 holds its single statement. Rewrite line L+1, at the same indentation, as a fifth block around that statement:
     - `if (item > 2) { <stmt> }` for JS, C, C++, C#, Java, Kotlin, PHP (PHP keeps `$item`);
@@ -301,7 +301,7 @@ test_the_plugin_has_no_errors_over_all_files() {
     Use the loop variable the file actually has. In `polyglot.expected`, change each of the 10 `max-nesting <file>:L` lines to `:L+1`.
   - `tests/fixtures/modular/src/order/order.service.ts` line 7 → `          if (order > 2) { total += order; }`. In `tests/check.test.sh`, the modular expected line becomes `max-nesting src/order/order.service.ts:7`.
   - `tests/check.test.sh` `test_rule_settings_switch_a_rule_off_or_raise_its_limit`: the name becomes `userAccountProfileDisplayName` and the override `{"max": 5}`.
-- [ ] **Step 3: watch it pass** — `bash tests/run.sh acceptance limits_default`, `bash tests/run.sh languages`, `bash tests/run.sh check`: all ok.
+- [x] **Step 3: watch it pass** — `bash tests/run.sh acceptance limits_default`, `bash tests/run.sh languages`, `bash tests/run.sh check`: all ok.
 
 ---
 
@@ -316,15 +316,15 @@ test_the_plugin_has_no_errors_over_all_files() {
 **Interfaces:**
 - Produces: `is_test_folder(name)` in roles.awk (`tests`, `test`, `__tests__`, `spec`); `is_test_path` treats any non-final segment for which `is_test_folder` is true as a test path; `cm_check_placement` (stdin: role lines; stdout: raw findings).
 
-- [ ] **Step 1: failing unit tests** — `tests/placement.test.sh`, reusing the `new_project`/`put` helpers copied from Task 0. Cover these cases:
+- [x] **Step 1: failing unit tests** — `tests/placement.test.sh`, reusing the `new_project`/`put` helpers copied from Task 0. Cover these cases:
   - a test in `tests/` → no finding;
   - `scripts/run.test.ts` outside the source root → no finding;
   - `src/test/java/BillingTest.java` → no finding;
   - `testsLocation: "__tests__"` with root `tests/x.test.ts` → `second test folder tests; keep all tests in __tests__/`.
 
   `tests/roles.test.sh` gets one assertion: `assert_equal "test - 0" "$(role_of "$root" modular src/user/__tests__/fixture.ts)"`.
-- [ ] **Step 2: watch them fail** — `bash tests/run.sh placement`; `bash tests/run.sh roles`.
-- [ ] **Step 3: implement:**
+- [x] **Step 2: watch them fail** — `bash tests/run.sh placement`; `bash tests/run.sh roles`.
+- [x] **Step 3: implement:**
   - `lib/awk/roles.awk`: add `function is_test_folder(name) { return name == "tests" || name == "test" || name == "__tests__" || name == "spec" }`. In `is_test_path`, replace the `segments[1] == …` test with a loop over positions `1 .. count-1` that returns 1 when `is_test_folder(segments[position])`.
   - `lib/awk/placement.awk`:
     ```awk
@@ -377,7 +377,7 @@ test_the_plugin_has_no_errors_over_all_files() {
     }
     ```
     In `cm_run_checks`, right after `cm_roles < "$files" > "$CM_TMP/roles"`: `cm_check_placement < "$CM_TMP/roles" >> "$CM_TMP/findings.raw"`. This runs for every layout and comes after the `: > findings.raw` line, so move that truncation above it.
-- [ ] **Step 4: watch them pass** — `bash tests/run.sh placement`, `bash tests/run.sh roles`, `bash tests/run.sh acceptance misplaced`, `bash tests/run.sh acceptance go_tests`, `bash tests/run.sh check`, `bash tests/run.sh languages`: all ok.
+- [x] **Step 4: watch them pass** — `bash tests/run.sh placement`, `bash tests/run.sh roles`, `bash tests/run.sh acceptance misplaced`, `bash tests/run.sh acceptance go_tests`, `bash tests/run.sh check`, `bash tests/run.sh languages`: all ok.
 
 ---
 
@@ -504,18 +504,18 @@ test_the_plugin_has_no_errors_over_all_files() {
 **Complexity:** routine
 **Satisfies:** — (docs; checked by review and `bash tests/run.sh manifest`)
 
-- [ ] **Step 1:** Spec. Add these sections:
+- [x] **Step 1:** Spec. Add these sections:
   - **§3.6 `lookup-chain`**: warning, `max` 3, TS/TSX/JS/Python. Four or more consecutive `if` branches (sibling ifs or an else-if chain) whose condition compares one name with literals (`==`/`===`, joined by `||`/`or`) and whose body is only `return <literal>`. Message `<N> if branches compare <name> with literals; use a lookup table`. Not checked in roles `consts`, `interfaces`, `test`.
   - **§3.7**: codemaster's own `lib/awk/lang.awk` (`language_of`, `language_extensions`) and `lib/awk/mirror.awk` (`default_test_name`, `test_names`) use lookup tables filled once in a loop. Awk isn't checked by codemaster, so `test_codemaster_awk_uses_lookup_tables` guards it.
 
   Add the two Public interface rows, with the quoted phrase "Оце можна було написать через массив", plus the Verification lines.
-- [ ] **Step 2:** `README.md` rules table:
+- [x] **Step 2:** `README.md` rules table:
   - `test-mirror`: "every module, helper and util **with a function** has a test in `tests/`";
   - `name-word-count`: at most 4 words;
   - `max-nesting`: at most 4 levels;
   - new rows `test-placement`, `file-name-suffix`, `array-repeated-elements`, `lookup-chain`;
   - the config example and the `testsLocation` default is `tests`.
-- [ ] **Step 3:** `references/rules.md`:
+- [x] **Step 3:** `references/rules.md`:
   - line 11: modular example `user/user.service.ts`, `user/consts.ts`, `user/interfaces.ts`;
   - the `test-mirror` row and its section: `tests/modules/user.test.ts`, only files with a function, never consts/interfaces;
   - `max-nesting` "deeper than 4 levels";
@@ -523,7 +523,7 @@ test_the_plugin_has_no_errors_over_all_files() {
   - the `testsLocation` row: "a folder name, default `tests`";
   - conventions line 153: "the dominant test folder among `tests/`, `test/`, `__tests__/`, `spec/`; tests next to the code are never a choice";
   - test-files paragraph: a test folder at any depth.
-- [ ] **Step 4:** `SKILL.md` "Rules while coding", add:
+- [x] **Step 4:** `SKILL.md` "Rules while coding", add:
   - "All tests live in the one tests folder (`testsLocation`, default `tests/`) mirroring the source tree; never next to the code, never a second test folder."
   - "Write tests only for functions; constants, interfaces and types get none."
   - "Name constants, interfaces and stylesheet files by role only: `user/consts.ts`, `user/interfaces.ts`, `button/button.css`, never `user.consts.ts`, `button.styles.css`, `button.module.css`."
@@ -531,7 +531,7 @@ test_the_plugin_has_no_errors_over_all_files() {
   - "Replace a chain of `if (x == literal) return literal` with a lookup table (object, map, array)."
 
   Coverage step 5: "100 % of the lines of functions". Bump `version` from 0.2.0 to 0.3.0 in `SKILL.md`, `plugin.json` and `marketplace.json`.
-- [ ] **Step 5:** `bash tests/run.sh manifest` → ok.
+- [x] **Step 5:** `bash tests/run.sh manifest` → ok.
 
 ---
 
@@ -545,8 +545,8 @@ test_the_plugin_has_no_errors_over_all_files() {
 **Interfaces:**
 - Produces: `language_of`, `language_extensions`, `default_test_name`, `test_names` keep their signatures and return values exactly.
 
-- [ ] **Step 1: watch it fail** — `bash tests/run.sh acceptance lookup_tables`.
-- [ ] **Step 2: implement:**
+- [x] **Step 1: watch it fail** — `bash tests/run.sh acceptance lookup_tables`.
+- [x] **Step 2: implement:**
   - `lang.awk`: a guarded `lang_tables()` (`if (lang_ready) return; lang_ready = 1`) builds:
     - `extension_language[...]` from `split("ts:typescript mts:typescript cts:typescript tsx:tsx js:javascript mjs:javascript cjs:javascript jsx:javascript py:python go:go rs:rust java:java kt:kotlin kts:kotlin cs:csharp php:php rb:ruby c:c h:c cc:cpp cpp:cpp cxx:cpp hpp:cpp hh:cpp hxx:cpp", pairs, " ")`, keeping every extension the current `language_of` maps (read the file and copy them all);
     - `language_extension_list[...]` from `"typescript:ts tsx mts cts js jsx mjs cjs"`-style entries, one per language (`tsx` and `javascript` get the TypeScript list; `cpp` is the default).
@@ -557,7 +557,7 @@ test_the_plugin_has_no_errors_over_all_files() {
     - `names_template` with the `|`-joined lists the current code returns. `go` and `rust` are empty. The script-language default builds `{stem}_test.<e>|test_{stem}.<e>|{stem}_tests.<e>` over `language_extensions(language)` in a loop, as now.
 
     Fill the tables once in the `!started` block.
-- [ ] **Step 3: watch it pass** — `bash tests/run.sh acceptance lookup_tables`, `bash tests/run.sh languages`, `bash tests/run.sh check`, `bash tests/run.sh roles`, `bash tests/run.sh portability`: all ok, the polyglot findings unchanged.
+- [x] **Step 3: watch it pass** — `bash tests/run.sh acceptance lookup_tables`, `bash tests/run.sh languages`, `bash tests/run.sh check`, `bash tests/run.sh roles`, `bash tests/run.sh portability`: all ok, the polyglot findings unchanged.
 
 ---
 
