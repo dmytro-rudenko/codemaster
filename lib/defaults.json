@@ -1,0 +1,45 @@
+{
+  "hook": true,
+  "layout": "auto",
+  "sourceRoot": "src",
+  "languages": ["typescript", "javascript", "python", "go", "rust", "java", "kotlin", "csharp", "php", "ruby", "c", "cpp"],
+  "exclude": [],
+  "entrypoints": ["src/index.*", "src/main.*", "bin/*", "main.go", "cmd/**/*.go", "src/bin/*.rs", "**/__main__.py", "manage.py"],
+  "singleFileMaxLines": 150,
+  "coverageCommand": null,
+  "abbreviationAllowlist": ["id", "url", "uri", "api", "http", "https", "json", "html", "css", "sql", "uuid", "io", "ui"],
+  "simplePackages": ["axios", "node-fetch", "got", "superagent", "request"],
+  "infrastructurePackages": [
+    "pg", "mysql2", "mongodb", "mongoose", "ioredis", "redis", "@prisma/client", "typeorm", "knex", "sequelize", "drizzle-orm",
+    "psycopg", "psycopg2", "asyncpg", "sqlalchemy", "pymongo", "motor", "django.db", "peewee",
+    "database/sql", "github.com/jackc/pgx", "github.com/lib/pq", "gorm.io/gorm", "go.mongodb.org/mongo-driver", "github.com/redis/go-redis", "github.com/jmoiron/sqlx",
+    "sqlx", "diesel", "sea_orm", "tokio_postgres", "mongodb",
+    "java.sql", "javax.persistence", "jakarta.persistence", "org.springframework.data", "org.hibernate", "redis.clients.jedis",
+    "Microsoft.EntityFrameworkCore", "System.Data.SqlClient", "Microsoft.Data.SqlClient", "Npgsql", "StackExchange.Redis", "MongoDB.Driver", "Dapper",
+    "PDO", "Illuminate\\Database", "Doctrine\\DBAL", "Doctrine\\ORM", "Predis",
+    "active_record", "sequel", "mysql2", "sqlite3",
+    "libpq-fe.h", "mysql.h", "sqlite3.h", "hiredis.h", "pqxx"
+  ],
+  "tournament": {
+    "minComplexity": 5,
+    "minLines": 10,
+    "weights": { "readability": 0.2, "length": 0.2, "bytecode": 0.2, "speed": 0.2, "closeness": 0.2 }
+  },
+  "libraryDigest": true,
+  "libraryDigestDev": false,
+  "libraryDigestPerRun": 5,
+  "roles": {
+    "module": ["modules", "services", "controllers", "features", "domains", "handlers"],
+    "interfaces": ["interfaces", "types", "typings", "contracts", "dto"],
+    "consts": ["consts", "constants", "enums"],
+    "helper": ["helpers"],
+    "util": ["utils", "util", "shared", "common", "lib"]
+  },
+  "testsLocation": "",
+  "testSuffix": "test",
+  "constantCase": "upper-snake",
+  "interfacePrefix": "",
+  "entityPrefix": true,
+  "rules": {},
+  "sources": {}
+}

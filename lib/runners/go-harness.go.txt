@@ -1,0 +1,143 @@
+package main
+
+// Tournament harness for Go, compiled together with one variant file (package main).
+// ./harness verify|measure <cases.json> <iterations>
+// Prints one line "CODEMASTER_RESULT <key> <value>": "passed 1", "failed <reason>" or "ns <float>".
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"reflect"
+	"strconv"
+	"strings"
+	"time"
+)
+
+type codemasterCase struct {
+	Input    []json.RawMessage `json:"input"`
+	Expected json.RawMessage   `json:"expected"`
+}
+
+func codemasterReport(key string, value string) {
+	fmt.Printf("CODEMASTER_RESULT %s %s\n", key, strings.Join(strings.Fields(value), " "))
+}
+
+func codemasterLoad(path string) ([]codemasterCase, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var list []codemasterCase
+	if json.Unmarshal(data, &list) == nil {
+		return list, nil
+	}
+	var wrapped struct {
+		Cases []codemasterCase `json:"cases"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return nil, err
+	}
+	return wrapped.Cases, nil
+}
+
+func codemasterArguments(target reflect.Value, input []json.RawMessage) ([]reflect.Value, error) {
+	kind := target.Type()
+	if len(input) != kind.NumIn() {
+		return nil, fmt.Errorf("expected %d arguments, got %d", kind.NumIn(), len(input))
+	}
+	values := make([]reflect.Value, len(input))
+	for position, raw := range input {
+		holder := reflect.New(kind.In(position))
+		if err := json.Unmarshal(raw, holder.Interface()); err != nil {
+			return nil, err
+		}
+		values[position] = holder.Elem()
+	}
+	return values, nil
+}
+
+func codemasterCall(target reflect.Value, input []json.RawMessage) (result interface{}, failure error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			failure = fmt.Errorf("panic: %v", recovered)
+		}
+	}()
+	values, err := codemasterArguments(target, input)
+	if err != nil {
+		return nil, err
+	}
+	var output []reflect.Value
+	if target.Type().IsVariadic() {
+		output = target.CallSlice(values)
+	} else {
+		output = target.Call(values)
+	}
+	errorType := reflect.TypeOf((*error)(nil)).Elem()
+	if count := len(output); count > 0 && output[count-1].Type() == errorType {
+		if !output[count-1].IsNil() {
+			return nil, output[count-1].Interface().(error)
+		}
+		output = output[:count-1]
+	}
+	if len(output) == 0 {
+		return nil, nil
+	}
+	if len(output) == 1 {
+		return output[0].Interface(), nil
+	}
+	list := make([]interface{}, len(output))
+	for position, value := range output {
+		list[position] = value.Interface()
+	}
+	return list, nil
+}
+
+func codemasterNormal(value interface{}) (interface{}, string) {
+	data, _ := json.Marshal(value)
+	var normal interface{}
+	json.Unmarshal(data, &normal)
+	return normal, string(data)
+}
+
+func main() {
+	mode, casesPath := os.Args[1], os.Args[2]
+	cases, err := codemasterLoad(casesPath)
+	if err != nil {
+		codemasterReport("failed", err.Error())
+		return
+	}
+	target := reflect.ValueOf(CODEMASTER_FUNCTION)
+	if mode == "verify" {
+		for position, entry := range cases {
+			actual, err := codemasterCall(target, entry.Input)
+			if err != nil {
+				codemasterReport("failed", fmt.Sprintf("case %d: threw %s", position, err))
+				return
+			}
+			normal, text := codemasterNormal(actual)
+			var expected interface{}
+			json.Unmarshal(entry.Expected, &expected)
+			if !reflect.DeepEqual(normal, expected) {
+				codemasterReport("failed", fmt.Sprintf("case %d: expected %s got %s", position, string(entry.Expected), text))
+				return
+			}
+		}
+		codemasterReport("passed", "1")
+		return
+	}
+	count, _ := strconv.Atoi(os.Args[3])
+	prepared := make([][]reflect.Value, len(cases))
+	for position, entry := range cases {
+		prepared[position], _ = codemasterArguments(target, entry.Input)
+	}
+	started := time.Now()
+	for call := 0; call < count; call++ {
+		if target.Type().IsVariadic() {
+			target.CallSlice(prepared[call%len(prepared)])
+		} else {
+			target.Call(prepared[call%len(prepared)])
+		}
+	}
+	codemasterReport("ns", strconv.FormatFloat(float64(time.Since(started).Nanoseconds())/float64(count), 'f', 2, 64))
+}
